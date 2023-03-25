@@ -1,4 +1,4 @@
-rootPath = ..
+rootPath = .
 include ${rootPath}/include.mk
 
 libSources = impl/*.c
@@ -11,6 +11,20 @@ stPafLibs = ${LDLIBS}
 all: all_libs all_progs
 all_libs: ${LIBDIR}/stPaf.a
 all_progs: all_libs ${BINDIR}/stPafTests ${BINDIR}/paf_chain ${BINDIR}/paf_invert ${BINDIR}/paf_tile ${BINDIR}/paf_trim ${BINDIR}/paf_shatter ${BINDIR}/paf_view ${BINDIR}/paf_dechunk ${BINDIR}/paf_dedupe ${BINDIR}/paf_to_bed ${BINDIR}/paf_upconvert
+
+sonLib:
+	mkdir -p ${LIBDIR} ${BINDIR}
+	cd submodules/sonLib && PKG_CONFIG_PATH=${CWD}/lib/pkgconfig:${PKG_CONFIG_PATH} ${MAKE}
+	mkdir -p ${BINDIR} ${LIBDIR} ${INCLDIR}
+	rm -rf submodules/sonLib/bin/*.dSYM
+	ln -f submodules/sonLib/lib/*.a ${LIBDIR}
+	ln -f submodules/sonLib/lib/sonLib.a ${LIBDIR}/libsonLib.a
+
+stPafDependencies = ${sonLibDir}/sonLib.a ${sonLibDir}/cuTest.a
+
+${sonLibDir}/sonLib.a : sonLib
+
+${sonLibDir}/cuTest.a : sonLib
 
 ${LIBDIR}/stPaf.a : ${libSources} ${libHeaders}  ${stPafDependencies}
 	${CC} ${CPPFLAGS} ${CFLAGS} ${LDFLAGS} -c ${libSources}
