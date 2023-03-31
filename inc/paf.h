@@ -52,7 +52,9 @@
 typedef enum _cigarOp {
     match = 0,
     query_insert = 1, // substring in the query and not the target
-    query_delete = 2 // substring in the target and not the query
+    query_delete = 2, // substring in the target and not the query
+    sequence_match = 3, // representing a match of identical bases - represented using an = symbol
+    sequence_mismatch = 4 // representing a mismatch - represented using an X symbol
 } CigarOp;
 
 typedef struct _cigar Cigar;
@@ -200,6 +202,22 @@ Interval *decode_fasta_header(char *fasta_header);
  * Compare intervals;
  */
 int cmp_intervals(const void *i, const void *j);
+
+/*
+ * Replace M runs with X/= runs indicate the present of matches and mismatches
+ */
+void paf_encode_mismatches(Paf *paf, char *query_seq, char *target_seq);
+
+/*
+ * Replace X/= runs with an M to indicate a gapless alignment
+ */
+void paf_remove_mismatches(Paf *paf);
+
+/*
+ * Remove the prefix and suffixes with identity < identity - (score_fraction * identity) of the entire alignment.
+ * Max fraction to trim is largest fraction of the alignment to trim as part of a tail.
+ */
+void paf_trim_unreliable_tails(Paf *paf, float score_fraction, float max_fraction_to_trim);
 
 #endif /* ST_PAF_H_ */
 

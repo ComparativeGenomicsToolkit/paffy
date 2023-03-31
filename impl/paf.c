@@ -27,9 +27,13 @@ static Cigar *parse_cigar_record(char **c) {
     char t = (*c)[i]; // The type of the cigar operation
     switch(t) {
     case 'M': // match
-    case '=': // exact match
-    case 'X': // snp match
         cigar->op = match;
+        break;
+    case '=': // exact match
+        cigar->op = sequence_match;
+        break;
+    case 'X': // snp match
+        cigar->op = sequence_mismatch;
         break;
     case 'I':
         cigar->op = query_insert;
@@ -195,7 +199,25 @@ char *paf_print(Paf *paf) {
         i += sprintf(buffer+i, "\tcg:Z:");
         Cigar *c = paf->cigar;
         while(c != NULL) {
-            i += sprintf(buffer+i, "%" PRIi64 "%c", c->length, c->op == match ? 'M' : (c->op == query_insert ? 'I' : 'D'));
+            char op_char;
+            switch(c->op) {
+                case match:
+                    op_char = 'M';
+                    break;
+                case query_insert:
+                    op_char = 'I';
+                    break;
+                case query_delete:
+                    op_char = 'D';
+                    break;
+                case sequence_match:
+                    op_char = '=';
+                    break;
+                case sequence_mismatch:
+                    op_char = 'X';
+                    break;
+            }
+            i += sprintf(buffer+i, "%" PRIi64 "%c", c->length, op_char);
             c = c->next;
             if(i > buf_size) {
                 st_errAbort("Size of paf record exceeded buffer size\n");
@@ -210,29 +232,22 @@ char *paf_print(Paf *paf) {
 
 void paf_stats_calc(Paf *paf, char *query_seq, char *target_seq,
                     int64_t *matches, int64_t *mismatches, int64_t *query_inserts, int64_t *query_deletes) {
+    paf_encode_mismatches(paf, query_seq, target_seq);
     (*matches)=0; (*mismatches)=0; (*query_inserts)=0; (*query_deletes)=0;
     Cigar *c = paf->cigar;
-    int64_t i=0, j=paf->target_start;
     while(c != NULL) {
-        if(c->op == match) {
-            for(int64_t k=0; k<c->length; k++) {
-                if(toupper(target_seq[j++]) ==
-                   toupper(paf->same_strand ? query_seq[paf->query_start+i++] : stString_reverseComplementChar(query_seq[paf->query_end-(++i)]))) {
-                    (*matches)++;
-                }
-                else {
-                    (*mismatches)++;
-                }
-            }
+        if(c->op == sequence_match) {
+            *matches += c->length;
+        }
+        else if(c->op == sequence_mismatch) {
+            *mismatches += c->length;
         }
         else if(c->op == query_insert) {
             (*query_inserts)++;
-            i += c->length;
         }
         else {
             assert(c->op == query_delete);
             (*query_deletes)++;
-            j += c->length;
         }
         c = c->next;
     }
@@ -313,10 +328,10 @@ void paf_check(Paf *paf) {
         int64_t i=0, j=0;
         Cigar *cigar = paf->cigar;
         while(cigar != NULL) {
-            if(cigar->op == match || cigar->op == query_insert) {
+            if(cigar->op != query_delete) {
                 i += cigar->length;
             }
-            if(cigar->op == match || cigar->op == query_delete) {
+            if(cigar->op != query_insert) {
                 j += cigar->length;
             }
             cigar = cigar->next;
@@ -575,4 +590,226 @@ int cmp_intervals(const void *i, const void *j) {
     Interval *x = (Interval *)i, *y = (Interval *)j;
     int k = strcmp(x->name, y->name);
     return k == 0 ? (x->start < y->start ? -1 : (x->start > y->start ? 1 : 0)) : k;
+}
+
+static Cigar *paf_make_match_encoding_mismatches(int64_t target_offset, char *target_seq,
+                                                 int64_t query_offset, char *query_seq,
+                                                 int64_t length, bool same_strand,
+                                                 Cigar **pCigar) {
+    Cigar *cigar = NULL;
+    // Calculate the length of the match
+    int64_t match_run_length=0, mismatch_run_length=0;
+    for(int64_t i=0; i<length; i++) {
+        if(toupper(target_seq[target_offset + i]) == toupper(same_strand ?
+                                                        query_seq[query_offset + i] :
+                                                        stString_reverseComplementChar(query_seq[query_offset - i]))) {
+            if(mismatch_run_length) {
+                assert(match_run_length == 0);
+                cigar = st_calloc(1, sizeof(Cigar)); // Allocate a cigar record
+                cigar->op = sequence_mismatch;
+                cigar->length = mismatch_run_length;
+                *pCigar = cigar;
+                pCigar = &(cigar->next);
+                mismatch_run_length = 0;
+            }
+            match_run_length++;
+        }
+        else {
+            if(match_run_length) {
+                assert(mismatch_run_length == 0);
+                cigar = st_calloc(1, sizeof(Cigar)); // Allocate a cigar record
+                cigar->op = sequence_match;
+                cigar->length = match_run_length;
+                *pCigar = cigar;
+                pCigar = &(cigar->next);
+                match_run_length = 0;
+            }
+            mismatch_run_length++;
+        }
+    }
+    cigar = st_calloc(1, sizeof(Cigar)); // Allocate a cigar record
+    *pCigar = cigar; // Connect the previous cigar to it
+    if(mismatch_run_length) {
+        assert(match_run_length == 0);
+        cigar->op = sequence_mismatch;
+        cigar->length = mismatch_run_length;
+    }
+    if(match_run_length) {
+        assert(mismatch_run_length == 0);
+        cigar->op = sequence_match;
+        cigar->length = match_run_length;
+    }
+    return cigar;
+}
+
+void paf_encode_mismatches(Paf *paf, char *query_seq, char *target_seq) {
+    Cigar *c = paf->cigar, **pCigar = &(paf->cigar);
+    int64_t i=0, j=paf->target_start;
+    while(c != NULL) {
+        if(c->op == match) {
+            Cigar *c2 = paf_make_match_encoding_mismatches(j, target_seq,
+                                                           paf->same_strand ? paf->query_start+i : paf->query_end-(i+1),
+                                                           query_seq, c->length, paf->same_strand, pCigar);
+            // Update the i and j coordinates
+            i += c->length;
+            j += c->length;
+            // Connect up the new matches
+            c2->next = c->next;
+            // Cleanup the old match
+            free(c);
+            // Now set c to be the end of the new run of matches
+            c = c2;
+        }
+        else if(c->op == query_insert) {
+            i += c->length;
+        }
+        else if (c->op == query_delete) {
+            j += c->length;
+        }
+        else { // Case the paf already has sequence matches and mismatches encoded
+            assert(c->op == sequence_match || c->op == sequence_mismatch);
+            i += c->length;
+            j += c->length;
+        }
+        // Move to the next operation
+        pCigar = &(c->next);
+        c = c->next;
+    }
+}
+
+void paf_remove_mismatches(Paf *paf) {
+    Cigar *c = paf->cigar;
+    while(c != NULL) {
+        if(c->op == sequence_match || c->op == sequence_mismatch) {
+            c->op = match; // relabel it a match
+            while(c->next != NULL && (c->next->op == sequence_match || c->next->op == sequence_mismatch)) { // remove any
+                // mismatches / matches
+                Cigar *c2 = c->next;
+                c->length += c2->length;
+                c->next = c2->next;
+                free(c2);
+            }
+        }
+        c = c->next;
+    }
+}
+
+Cigar *paf_trim_unreliable_ends2(Cigar *c, int64_t *matches, int64_t *mismatches, double identity_threshold,
+                                 bool less_than, int64_t max_trim) {
+    /*
+     * Get the longest prefix with an identity less than the given identity threshold.
+     * Also calculate the number of matches / mismatches in the alignment
+     */
+    (*matches)=0; (*mismatches)=0;
+    Cigar *c2 = NULL;
+    while(c != NULL) { // For each cigar op in sequence
+        // First add the op to the number of matches / mismatches
+        if(c->op == sequence_match || c->op == match) {
+            (*matches) += c->length;
+        }
+        else { // Note indels are treated as mismatches
+            (*mismatches) += c->length;
+        }
+        if(max_trim >= 0 && *matches + *mismatches > max_trim) { // Don't trim if longer a threshold number of bases
+            break;
+        }
+        double prefix_identity = ((float)(*matches))/((*matches) + (*mismatches));
+        if((less_than && prefix_identity < identity_threshold) ||
+           (!less_than && prefix_identity >= identity_threshold)) { // Including this op, does the prefix have identity
+            // < identity threshold (or >= if less_than is false)
+            c2 = c;
+        }
+        c = c->next;
+    }
+    return c2; // Return longest prefix with identity < identity threshold
+}
+
+void paf_trim_upto(Paf *paf, Cigar *trim_upto) {
+    /*
+     * Remove the prefix of cigar operations up to but excluding the given op, trim_upto
+     */
+    while(paf->cigar != NULL && paf->cigar != trim_upto) {
+        if (paf->cigar->op != query_insert) {
+            paf->target_start += paf->cigar->length;
+        }
+        if (paf->cigar->op != query_delete) {
+            if (paf->same_strand) {
+                paf->query_start += paf->cigar->length;
+            } else {
+                paf->query_end -= paf->cigar->length;
+            }
+        }
+        paf->cigar = paf->cigar->next;
+    }
+    assert(paf->cigar == trim_upto);
+}
+
+void paf_trim_unreliable_prefix(Paf *paf, float identity_threshold, int64_t max_trim) {
+    /*
+     * Trim a prefix of the paf with identity < identity_threshold. Will not trim more than max_trim of columns of the
+     * alignment.
+     */
+
+    // Calculate largest prefix with identity less than the identity threshold
+    int64_t matches, mismatches;
+    Cigar *c = paf_trim_unreliable_ends2(paf->cigar, &matches, &mismatches, identity_threshold, 1, max_trim);
+
+    if(c != NULL) { // If there is a prefix with low identity
+
+        // Trim back the prefix to avoid chopping off a suffix of the prefix with identity
+        // higher than the given threshold identity
+        paf->cigar = cigar_reverse(paf->cigar); // Reverse the linked list of cigar ops
+        Cigar *c2 = paf_trim_unreliable_ends2(c, &matches, &mismatches, identity_threshold, 0, -1); // Get the longest
+                                              // suffix of the prefix with identity >= the identity threshold
+        paf->cigar = cigar_reverse(paf->cigar); // Reverse back the linked list of cigar ops
+        if(c2 != NULL) { // If c2 (the longest suffix) is not null, we trim up to c2 but not including it
+            c = c2;
+        }
+        else { // otherwise, we want to trim everything including c, so we set c to c->next so
+            // that we include c in the trim
+            c = c->next;
+        }
+
+        // Now trim the prefix
+        assert(c != NULL);
+        paf_trim_upto(paf, c);
+    }
+}
+
+void paf_trim_unreliable_tails(Paf *paf, float score_fraction, float max_fraction_to_trim) {
+    /*
+     * Algorithm, adapted from proposal by Bob Harris:
+     *
+     * First compute the average identity, i, over the whole alignment (m/(m+mm+i+d),
+     * (b) identify the longest prefix for which the identity is significantly less than i
+     * (i - i * score_fraction), then (c) shorten the prefix by re-including the longest suffix of the prefix that has
+     * an identity equal or higher to i, (d) trim this prefix, (e) repeat for the suffix, still using the original i.
+     * This is not quite symmetric, but it works okay in practice.
+     *
+     * The tails trimmed will not exceed more than max_fraction_to_trim of the original alignment.
+     */
+
+    // Get global match/mismatch stats
+    int64_t matches, mismatches;
+    paf_trim_unreliable_ends2(paf->cigar, &matches, &mismatches, 0, 1, -1);
+
+    double identity = ((float)matches)/(matches + mismatches); // Calculate the identity
+    double identity_threshold = identity - (identity * score_fraction); // Calculate the identity threshold below which to
+    // trim the tail
+    int64_t max_trim = (matches + mismatches) * max_fraction_to_trim;
+
+    paf_trim_unreliable_prefix(paf, identity_threshold, max_trim); // Trim the prefix
+    paf_invert(paf); // Invert the paf
+    paf_trim_unreliable_prefix(paf, identity_threshold, max_trim); // So trimming the suffix
+    paf_invert(paf); // And invert it back
+
+    // Debug output - check the final identity of the trimmed alignment is not less than the starting alignment
+    int64_t trimmed_matches, trimmed_mismatches;
+    paf_trim_unreliable_ends2(paf->cigar, &trimmed_matches, &trimmed_mismatches, 0, 1, -1);
+    double final_identity = ((float)trimmed_matches)/(trimmed_matches + trimmed_mismatches); // Calculate the identity
+    st_logDebug("Trimming unreliable prefix, got: %" PRIi64 " matches and %" PRIi64
+    " mismatches, an alignment identity of %f and trim threshold of %f, after trimming got identity of %f with %" PRIi64
+    " matches and %" PRIi64 " mismatches, using a max trim of %" PRIi64 " bases\n",
+        matches, mismatches, identity, identity_threshold, final_identity, trimmed_matches, trimmed_mismatches, max_trim);
+    assert(final_identity >= identity);
 }

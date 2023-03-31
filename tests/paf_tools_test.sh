@@ -24,10 +24,6 @@ lastz ${working_dir}/*.fa --format=paf > ${working_dir}/output.paf
 echo "minimum local alignment identity"
 paf_view -i ${working_dir}/output.paf ${working_dir}/*.fa | cut -f9 | sort | head -n1
 
-# Run paf_view with trim
-echo "paf_trim minimum local alignment identity"
-paf_trim -i ${working_dir}/output.paf | paf_view ${working_dir}/*.fa | cut -f9 | sort | head -n1
-
 # Run paf_view with invert
 echo "paf_invert minimum local alignment identity"
 paf_invert -i ${working_dir}/output.paf | paf_view ${working_dir}/*.fa | cut -f9 | sort | head -n1
@@ -43,3 +39,19 @@ paf_shatter -i ${working_dir}/output.paf | paf_view ${working_dir}/*.fa | cut -f
 # Run paf_view with tile
 echo "paf_tile minimum local alignment identity"
 paf_tile -i ${working_dir}/output.paf | paf_view ${working_dir}/*.fa | cut -f9 | sort | head -n1
+
+# Run paf_add_mismatches
+echo "adding mismatches"
+paf_add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paf_view ${working_dir}/*.fa | cut -f9 | sort | head -n1
+
+# Run paf_add_mismatches
+echo "adding and then remove mismatches"
+paf_add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paf_add_mismatches -a | paf_view ${working_dir}/*.fa | cut -f9 | sort | head -n1
+
+# Run paf_view with trim (identity may be higher as we trim the tails)
+echo "paf_trim minimum local alignment identity"
+paf_add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paf_trim -r 0.95 | paf_view ${working_dir}/*.fa | cut -f9 | sort | head -n1
+
+# Run paf_view with trim (identity may be higher as we trim the tails)
+echo "paf_trim minimum local alignment identity, ignoring mismatches"
+paf_trim -r 0.95 -i ${working_dir}/output.paf | paf_view ${working_dir}/*.fa | cut -f9 | sort | head -n1
