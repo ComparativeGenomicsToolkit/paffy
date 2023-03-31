@@ -12,12 +12,11 @@ working_dir=$(mktemp -d -t temp_chains-XXXXXXXXXX)
 # Make sure we cleanup the temp dir
 trap "rm -rf ${working_dir}" EXIT
 
-sequenceNames="simCow.chr6 simDog.chr6"
-for i in ${sequenceNames}
-do
-wget https://raw.githubusercontent.com/UCSantaCruzComputationalGenomicsLab/cactusTestData/master/evolver/mammals/loci1/${i} -O ${working_dir}/${i}.fa
-done
+# Get the sequences
+wget https://raw.githubusercontent.com/UCSantaCruzComputationalGenomicsLab/cactusTestData/master/evolver/mammals/loci1/simCow.chr6 -O ${working_dir}/simCow.chr6.fa
+wget https://raw.githubusercontent.com/UCSantaCruzComputationalGenomicsLab/cactusTestData/master/evolver/mammals/loci1/simDog.chr6 -O ${working_dir}/simDog.chr6.fa
 
+# Run lastz
 lastz ${working_dir}/*.fa --format=paf > ${working_dir}/output.paf
 
 # Run paf_view

@@ -15,8 +15,8 @@
 #include <getopt.h>
 #include <time.h>
 
-static int64_t max_gap_length = 10000;
-static float percentage_to_trim = 0.02;
+static int64_t max_gap_length = 1000000;
+static float percentage_to_trim = 0.5;
 static int64_t chain_gap_open = 5000;
 static int64_t chain_gap_extend = 1;
 
