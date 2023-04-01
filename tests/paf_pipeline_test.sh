@@ -11,7 +11,7 @@ set -x
 # Make a working directory
 #working_dir=$(mktemp -d -t temp_chains-XXXXXXXXXX)
 working_dir=./temp_chains
-mkdir ${working_dir}
+mkdir -p ${working_dir}
 
 # Make sure we cleanup the temp dir
 #trap "rm -rf ${working_dir}" EXIT
@@ -38,7 +38,7 @@ paf_add_mismatches -i ${working_dir}/combined.paf ${working_dir}/*.fa > ${workin
 
 # Run paf_trim
 echo "Trimming"
-paf_trim -i ${working_dir}/mismatches.paf -r 0.95 -t 0.0 > ${working_dir}/trimmed.paf
+paf_trim -i ${working_dir}/mismatches.paf > ${working_dir}/trimmed.paf
 
 # Removing mismatches
 echo "Removing mismatches"

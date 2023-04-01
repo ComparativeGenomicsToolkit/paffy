@@ -49,7 +49,7 @@ paf_add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paf_add_mi
 
 # Run paf_view with trim (identity may be higher as we trim the tails)
 echo "paf_trim minimum local alignment identity"
-paf_add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paf_trim -r 0.95 | paf_view ${working_dir}/*.fa | cut -f9 | sort | head -n1
+paf_add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paf_trim | paf_view ${working_dir}/*.fa | cut -f9 | sort | head -n1
 
 # Run paf_view with trim (identity may be higher as we trim the tails)
 echo "paf_trim minimum local alignment identity, ignoring mismatches"

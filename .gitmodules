@@ -1,3 +1,6 @@
 [submodule "submodules/sonLib"]
 	path = submodules/sonLib
 	url = https://github.com/ComparativeGenomicsToolkit/sonLib
+[submodule "submodules/simple-dotplot"]
+	path = submodules/simple-dotplot
+	url = https://github.com/rlorigro/simple-dotplot.git

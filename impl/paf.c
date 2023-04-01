@@ -744,7 +744,7 @@ void paf_trim_upto(Paf *paf, Cigar *trim_upto) {
     assert(paf->cigar == trim_upto);
 }
 
-void paf_trim_unreliable_prefix(Paf *paf, float identity_threshold, int64_t max_trim) {
+void paf_trim_unreliable_prefix(Paf *paf, float identity_threshold, float identity, int64_t max_trim) {
     /*
      * Trim a prefix of the paf with identity < identity_threshold. Will not trim more than max_trim of columns of the
      * alignment.
@@ -759,8 +759,8 @@ void paf_trim_unreliable_prefix(Paf *paf, float identity_threshold, int64_t max_
         // Trim back the prefix to avoid chopping off a suffix of the prefix with identity
         // higher than the given threshold identity
         paf->cigar = cigar_reverse(paf->cigar); // Reverse the linked list of cigar ops
-        Cigar *c2 = paf_trim_unreliable_ends2(c, &matches, &mismatches, identity_threshold, 0, -1); // Get the longest
-                                              // suffix of the prefix with identity >= the identity threshold
+        Cigar *c2 = paf_trim_unreliable_ends2(c, &matches, &mismatches, identity, 0, -1); // Get the longest
+                                              // suffix of the prefix with identity >= the identity of the alignment
         paf->cigar = cigar_reverse(paf->cigar); // Reverse back the linked list of cigar ops
         if(c2 != NULL) { // If c2 (the longest suffix) is not null, we trim up to c2 but not including it
             c = c2;
@@ -798,18 +798,29 @@ void paf_trim_unreliable_tails(Paf *paf, float score_fraction, float max_fractio
     // trim the tail
     int64_t max_trim = (matches + mismatches) * max_fraction_to_trim;
 
-    paf_trim_unreliable_prefix(paf, identity_threshold, max_trim); // Trim the prefix
+    paf_trim_unreliable_prefix(paf, identity_threshold, identity, max_trim); // Trim the prefix
     paf_invert(paf); // Invert the paf
-    paf_trim_unreliable_prefix(paf, identity_threshold, max_trim); // So trimming the suffix
+    paf_trim_unreliable_prefix(paf, identity_threshold, identity, max_trim); // So trimming the suffix
     paf_invert(paf); // And invert it back
 
     // Debug output - check the final identity of the trimmed alignment is not less than the starting alignment
     int64_t trimmed_matches, trimmed_mismatches;
     paf_trim_unreliable_ends2(paf->cigar, &trimmed_matches, &trimmed_mismatches, 0, 1, -1);
-    double final_identity = ((float)trimmed_matches)/(trimmed_matches + trimmed_mismatches); // Calculate the identity
-    st_logDebug("Trimming unreliable prefix, got: %" PRIi64 " matches and %" PRIi64
-    " mismatches, an alignment identity of %f and trim threshold of %f, after trimming got identity of %f with %" PRIi64
-    " matches and %" PRIi64 " mismatches, using a max trim of %" PRIi64 " bases\n",
-        matches, mismatches, identity, identity_threshold, final_identity, trimmed_matches, trimmed_mismatches, max_trim);
+    double final_identity =
+            ((float) trimmed_matches) / (trimmed_matches + trimmed_mismatches); // Calculate the identity
+    if((trimmed_matches != matches || trimmed_mismatches != mismatches) && final_identity > identity + 0.1) {
+        st_logDebug("Trimming unreliable prefix, got: %"
+        PRIi64
+        " matches and %"
+        PRIi64
+        " mismatches, an alignment identity of %f and trim threshold of %f, after trimming got identity of %f with %"
+        PRIi64
+        " matches and %"
+        PRIi64
+        " mismatches, using a max trim of %"
+        PRIi64
+        " bases\n",
+                matches, mismatches, identity, identity_threshold, final_identity, trimmed_matches, trimmed_mismatches, max_trim);
+    }
     assert(final_identity >= identity);
 }
