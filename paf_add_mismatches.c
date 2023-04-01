@@ -14,7 +14,7 @@
 #include <time.h>
 #include "bioioC.h"
 
-void usage() {
+void usage(void) {
     fprintf(stderr, "paf_add_mismatches [fasta_files]xN [options], version 0.1\n");
     fprintf(stderr, "Add mismatches to PAF alignments (so encoding X and = in place of M)\n");
     fprintf(stderr, "-i --inputFile : Input paf file to invert. If not specified reads from stdin\n");

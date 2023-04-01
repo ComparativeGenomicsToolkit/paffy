@@ -11,7 +11,7 @@
 #include "bioioC.h"
 #include "sonLib.h"
 
- void usage() {
+ void usage(void) {
      fprintf(stderr, "paf_dechunk [options], version 0.1\n");
      fprintf(stderr, "Used in conjunction with fasta_chunk.\n"
                      "Modifies paf coordinates to remove the chunk coordinate name encoding created by fasta_chunk.\n");

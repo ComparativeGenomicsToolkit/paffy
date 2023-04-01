@@ -15,7 +15,7 @@
 #include <getopt.h>
 #include <time.h>
 
-void usage() {
+void usage(void) {
     fprintf(stderr, "paf_to_bed [options], version 0.1\n");
     fprintf(stderr, "Creates a bed file representing the coverage of alignments on the query sequences of the paf alignments\n");
     fprintf(stderr, "-i --inputFile : Input paf file. If not specified reads from stdin\n");

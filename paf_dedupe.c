@@ -15,7 +15,7 @@
 #include <time.h>
 #include "bioioC.h"
 
-void usage() {
+void usage(void) {
     fprintf(stderr, "paf_dedupe [options], version 0.1\n");
     fprintf(stderr, "Pretty print PAF alignments\n");
     fprintf(stderr, "-i --inputFile : Input paf file to invert. If not specified reads from stdin\n");

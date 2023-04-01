@@ -13,7 +13,7 @@
 
 static float trim_end_fraction = 1.0;
 static float trim_by_identity = 1;
-static float trim_by_identity_fraction = 0.3;
+static float trim_by_identity_fraction = 0.2;
 
  void usage() {
      fprintf(stderr, "paf_trim [options], version 0.1\n");

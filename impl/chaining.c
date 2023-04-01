@@ -121,7 +121,7 @@ static void chain_to_pafs(Chain *chain, int64_t (*gap_cost)(int64_t, int64_t, vo
 
     while (chain != NULL) {
         chain->paf->chain_id = chain_id;
-        chain->paf->score = total_score;
+        chain->paf->chain_score = total_score;
         stList_append(output_pafs, chain->paf);
         // Shift back to the previous link and cleanup
         Chain *c = chain;

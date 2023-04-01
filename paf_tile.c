@@ -5,7 +5,7 @@
  *
  * Rough outline:
  * (1) Load local alignments files (PAF)
- * (2) Sort alignments by score, from best-to-worst
+ * (2) Sort alignments by chain_score and then score, from best-to-worst
  * (3) Create integer array representing counts of alignments to bases in the genome, setting values initially to 0.
  * (4) Iterate through alignments, from best-to-worst, find maximum?? count, q, of aligned bases to a base covered by the alignment,
  * set the "level" of the alignment to q+1, increase by one the aligned bases count of each base covered by the alignment.
@@ -17,7 +17,7 @@
 #include <getopt.h>
 #include <time.h>
 
-void usage() {
+void usage(void) {
     fprintf(stderr, "paf_tile [options], version 0.1\n");
     fprintf(stderr, "Tiles the records in the PAF file\n");
     fprintf(stderr, "-i --inputFile : Input paf file. If not specified reads from stdin\n");
@@ -28,7 +28,10 @@ void usage() {
 
 int paf_cmp_by_descending_score(const void *a, const void *b) {
     Paf *p1 = (Paf *)a, *p2 = (Paf *)b;
-    return p1->score > p2->score ? -1 : (p1->score < p2->score ? 1 : 0);
+    // Sort first by chain score, then if tied, sort by alignment score
+    return p1->chain_score > p2->chain_score ? -1 : (p1->chain_score < p2->chain_score ? 1 :
+                                                     (p1->score > p2->score ? -1 :
+                                                     (p1->score < p2->score ? 1 : 0)));
 }
 
 int64_t get_median_alignment_level(uint16_t *counts, Paf *paf) {

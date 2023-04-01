@@ -20,7 +20,7 @@ static float percentage_to_trim = 0.5;
 static int64_t chain_gap_open = 5000;
 static int64_t chain_gap_extend = 1;
 
-void usage() {
+void usage(void) {
     fprintf(stderr, "paf_chain [options], version 0.1\n");
     fprintf(stderr, "Chains the records in the PAF file into chains, rescoring them as chains.\nChains are indicated with the cn tag.\n");
     fprintf(stderr, "-i --inputFile : Input paf file to invert. If not specified reads from stdin\n");

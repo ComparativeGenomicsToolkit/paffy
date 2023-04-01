@@ -31,7 +31,7 @@
  *
  * tp	A	Type of aln: P/primary, S/secondary and I,i/inversion
  * cm	i	Number of minimizers on the chain [NOT SUPPORTED/IGNORED]
- * s1	i	Chaining score [NOT SUPPORTED/IGNORED]
+ * s1	i	Chaining score [SUPPORTED]
  * s2	i	Chaining score of the best secondary chain [NOT SUPPORTED/IGNORED]
  * NM	i	Total number of mismatches and gaps in the alignment [NOT SUPPORTED/IGNORED]
  * MD	Z	To generate the ref sequence in the alignment [NOT SUPPORTED/IGNORED]
@@ -82,6 +82,7 @@ typedef struct _paf {
     int64_t tile_level; // this is a special tag created by paf_tile that indicates the "level" of the alignment in the
     // chaining (somewhat like the nesting of chains within nets in ucsc chains and nets).
     int64_t chain_id; // a tag to indicate which chain a paf belongs to
+    int64_t chain_score; // a tag to indicate the score the of chain the paf belongs to, uses s1 tag
     char type; // is 'P' primary / 'S' secondary / 'I' inversion
 } Paf;
 

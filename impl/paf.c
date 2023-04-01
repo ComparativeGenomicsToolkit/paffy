@@ -110,8 +110,10 @@ Paf *paf_parse(char *paf_string) {
     paf->num_bases = atoll(stList_get(tokens, 10));
     paf->mapping_quality = atoll(stList_get(tokens, 11));
 
+    // Set the following to default values to distinguish them from when they are initialized and 0
     paf->tile_level = -1;
     paf->chain_id = -1;
+    paf->chain_score = -1;
 
     // Parse the remaining optional tags
     for(int64_t i=12; i<stList_length(tokens); i++) {
@@ -130,6 +132,9 @@ Paf *paf_parse(char *paf_string) {
         }
         else if(strcmp(type, "cn") == 0) {
             paf->chain_id = atoll(stList_get(tag, 2));
+        }
+        else if(strcmp(type, "s1") == 0) {
+            paf->chain_score = atoll(stList_get(tag, 2));
         }
         stList_destruct(tag);
     }
@@ -191,6 +196,9 @@ char *paf_print(Paf *paf) {
     }
     if(paf->chain_id != -1) {
         i += sprintf(buffer+i, "\tcn:i:%" PRIi64, paf->chain_id);
+    }
+    if(paf->chain_score != -1) {
+        i += sprintf(buffer+i, "\ts1:i:%" PRIi64, paf->chain_score);
     }
     if(i > buf_size) {
         st_errAbort("Size of paf record exceeded buffer size\n");

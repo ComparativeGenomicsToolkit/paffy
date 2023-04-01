@@ -15,7 +15,7 @@
 #include "sonLib.h"
 #include "paf.h"
 
-void usage() {
+void usage(void) {
     fprintf(stderr, "paf_upconvert [fasta_file]xN [options], version 0.1\n");
     fprintf(stderr, "Converts the coordinates of paf alignments to refer to extracted subsequences.\n");
     fprintf(stderr, "-i --inFile : The input paf file. If omitted then reads pafs from stdin\n");

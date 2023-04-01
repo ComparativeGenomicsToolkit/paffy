@@ -13,7 +13,7 @@
 #include <getopt.h>
 #include <time.h>
 
-void usage() {
+void usage(void) {
     fprintf(stderr, "paf_shatter [options], version 0.1\n");
     fprintf(stderr, "Break up paf alignments into individual matches\n");
     fprintf(stderr, "-i --inputFile : Input paf file to invert. If not specified reads from stdin\n");
