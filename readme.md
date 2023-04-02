@@ -16,7 +16,7 @@ To test the installation, after adding the paffy/bin directory to your path, do:
 
 This will run a small number of tests. 
 
-# Taffy Utilities
+# Paffy Utilities
 
 All Paffy utilities are run using `paffy <command>`, where the available commands are:
 
@@ -44,8 +44,3 @@ For example, to pretty print a PAF alignment:
 There is also a simple C library for working with taf/maf files. See paf.h in the
 inc directory.
 
-# TODOs
-
-Things that are ongoing:
-
-* Make `taffy add-gap-bases` use indexed fastas to avoid loading everything into memory
