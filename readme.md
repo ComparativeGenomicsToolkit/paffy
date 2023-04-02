@@ -2,6 +2,8 @@
 
 This is a C and CLI library for manipulating/reading/writing 
 [Pairwise Alignment Format (PAF)](https://github.com/lh3/miniasm/blob/master/PAF.md).
+It is used by [Cactus](https://github.com/ComparativeGenomicsToolkit/cactus) in creating the 
+local, pairwise alignments between input sequences.
 
 # Installing Paffy CLI/C Library
 
@@ -43,4 +45,11 @@ For example, to pretty print a PAF alignment:
 
 There is also a simple C library for working with taf/maf files. See paf.h in the
 inc directory.
+
+# Cactus Local Alignment Pipeline
+
+To understand the steps in the pairwise alignment pipeline used by Cactus
+see tests/paf_pipeline_test.sh. The objective is to find chains
+of high-quality local alignments used to anchor the multiple sequence alignemnt
+process.
 
