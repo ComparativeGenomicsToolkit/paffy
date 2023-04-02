@@ -1,5 +1,5 @@
 /*
- * paf_view: Remove duplicates from a paf file
+ * paf_dedupe: Remove duplicates from a paf file
  *
  *  Released under the MIT license, see LICENSE.txt
  *
