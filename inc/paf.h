@@ -107,6 +107,12 @@ Paf *paf_read(FILE *fh);
 char *paf_print(Paf *paf);
 
 /*
+ * Calculate stats from a paf record. Requires that the paf encode mismatches if mismatches are to be accurate
+ */
+void paf_stats_calc(Paf *paf, int64_t *matches, int64_t *mismatches, int64_t *query_inserts, int64_t *query_deletes,
+                    int64_t *query_insert_bases, int64_t *query_delete_bases, bool zero_counts);
+
+/*
  * Prints a human readable alignment view of the paf
  */
 void paf_pretty_print(Paf *paf, char *query_seq, char *target_seq, FILE *fh, bool include_alignment);
@@ -162,13 +168,6 @@ void paf_trim_end_fraction(Paf *paf, float percentage);
  * Breaks up a paf into its set of constituent matches
  */
 stList *paf_shatter(Paf *paf);
-
-/*
- * Calculate stats on the alignment
- */
-void paf_stats_calc(Paf *paf, char *query_seq, char *target_seq,
-                       int64_t *matches, int64_t *mismatches, int64_t *query_inserts, int64_t *query_deletes);
-
 
 /*
  * Structure used to represent alignment coverage along a sequence

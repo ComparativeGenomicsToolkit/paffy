@@ -14,7 +14,7 @@ working_dir=./temp_chains
 mkdir -p ${working_dir}
 
 # Make sure we cleanup the temp dir
-#trap "rm -rf ${working_dir}" EXIT
+trap "rm -rf ${working_dir}" EXIT
 
 # Get the sequences
 wget https://raw.githubusercontent.com/ComparativeGenomicsToolkit/cactusTestData/master/T2T_primate_PAR/mPanPan1_XY_1_5000000.fa -O ${working_dir}/mPanPan1_XY_1_5000000.fa
@@ -59,3 +59,7 @@ grep 'tp:A:P' ${working_dir}/tiled.paf > ${working_dir}/primary.paf
 # Add back the mismatches
 echo "Adding mismatches to the primary alignments"
 paf_add_mismatches -i ${working_dir}/primary.paf ${working_dir}/*.fa > ${working_dir}/primary_mismatches.paf
+
+# Report stats on the primary alignments picked
+echo "Reporting stats on primary alignments and check aligned bases and identity are as expected"
+paf_view -i ${working_dir}/primary_mismatches.paf ${working_dir}/*.fa -s -t -u 0.98 -v 17400000

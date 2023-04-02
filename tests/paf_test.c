@@ -47,14 +47,19 @@ static void test_paf(CuTest *testCase) {
 }
 
 static void test_paf_tools(CuTest *testCase) {
-    // Run the different paf tools and check they don't screw anything up
-    st_system("./tests/paf_tools_test.sh\n");
-    // todo capture output and test it
+    // Run the different paf tools and check they don't screw anything up - non-zero return value indicates fail
+    CuAssertTrue(testCase, st_system("./tests/paf_tools_test.sh") == 0);
+}
+
+static void test_paf_pipeline(CuTest *testCase) {
+    // Run the basic paf tools in the cactus pipeline
+    CuAssertTrue(testCase, st_system("./tests/paf_pipeline_test.sh") == 0);
 }
 
 CuSuite* addPafTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
     SUITE_ADD_TEST(suite, test_paf);
     SUITE_ADD_TEST(suite, test_paf_tools);
+    SUITE_ADD_TEST(suite, test_paf_pipeline);
     return suite;
 }

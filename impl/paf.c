@@ -238,13 +238,15 @@ char *paf_print(Paf *paf) {
     return buffer;
 }
 
-void paf_stats_calc(Paf *paf, char *query_seq, char *target_seq,
-                    int64_t *matches, int64_t *mismatches, int64_t *query_inserts, int64_t *query_deletes) {
-    paf_encode_mismatches(paf, query_seq, target_seq);
-    (*matches)=0; (*mismatches)=0; (*query_inserts)=0; (*query_deletes)=0;
+void paf_stats_calc(Paf *paf, int64_t *matches, int64_t *mismatches, int64_t *query_inserts, int64_t *query_deletes,
+                    int64_t *query_insert_bases, int64_t *query_delete_bases, bool zero_counts) {
+    if(zero_counts) { // If requested to set these counts to zero
+        (*matches) = 0; (*mismatches) = 0; (*query_inserts) = 0; (*query_deletes) = 0;
+        (*query_insert_bases) = 0; (*query_delete_bases) = 0;
+    }
     Cigar *c = paf->cigar;
     while(c != NULL) {
-        if(c->op == sequence_match) {
+        if(c->op == sequence_match || c->op == match) {
             *matches += c->length;
         }
         else if(c->op == sequence_mismatch) {
@@ -252,10 +254,12 @@ void paf_stats_calc(Paf *paf, char *query_seq, char *target_seq,
         }
         else if(c->op == query_insert) {
             (*query_inserts)++;
+            (*query_insert_bases)+=c->length;
         }
         else {
             assert(c->op == query_delete);
             (*query_deletes)++;
+            (*query_delete_bases)+=c->length;
         }
         c = c->next;
     }
@@ -269,11 +273,16 @@ static void paf_pretty_print2(char *seq, int64_t i, int64_t j, FILE *fh) {
 }
 
 void paf_pretty_print(Paf *paf, char *query_seq, char *target_seq, FILE *fh, bool include_alignment) {
-    int64_t matches, mismatches, query_inserts, query_deletes;
-    paf_stats_calc(paf, query_seq, target_seq, &matches, &mismatches, &query_inserts, &query_deletes);
-    fprintf(fh, "Query:%s\tQ-start:%" PRIi64 "\tQ-length:%" PRIi64 "\tTarget:%s\tT-start:%" PRIi64 "\tT-length:%" PRIi64 "\tSame-strand:%i\tScore:%" PRIi64 "\tIdentity:%f\tAligned-bases:%" PRIi64 "\tQuery-inserts:%" PRIi64 "\tQuery-deletes:%" PRIi64 "\n",
-            paf->query_name, paf->query_start, paf->query_end-paf->query_start, paf->target_name, paf->target_start, paf->target_end-paf->target_start,
-            (int)paf->same_strand, paf->score, (float)matches/(matches+mismatches), matches+mismatches, query_inserts, query_deletes);
+    int64_t matches, mismatches, query_inserts, query_deletes, query_insert_bases, query_delete_bases;
+    paf_stats_calc(paf, &matches, &mismatches, &query_inserts, &query_deletes, &query_insert_bases, &query_delete_bases, 1);
+    fprintf(fh, "Query:%s\tQ-start:%" PRIi64 "\tQ-length:%" PRIi64 "\tTarget:%s\tT-start:%" PRIi64 "\tT-length:%"
+            PRIi64 "\tSame-strand:%i\tScore:%" PRIi64 "\tIdentity:%f\tIdentity-with-gaps%f\tAligned-bases:%"
+            PRIi64 "\tQuery-inserts:%" PRIi64 "\tQuery-deletes:%" PRIi64 "\n",
+            paf->query_name, paf->query_start, paf->query_end-paf->query_start, paf->target_name, paf->target_start,
+            paf->target_end-paf->target_start,
+            (int)paf->same_strand, paf->score, (float)matches/(matches+mismatches),
+            (float)matches/(matches+mismatches+query_insert_bases+query_delete_bases), matches+mismatches,
+            query_inserts, query_deletes);
 
     // Now print a base level alignment
     if(include_alignment) {

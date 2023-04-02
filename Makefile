@@ -68,6 +68,10 @@ ${BINDIR}/paf_add_mismatches : paf_add_mismatches.c ${LIBDEPENDS} ${commonPafLib
 ${BINDIR}/stPafTests : ${libTests} ${LIBDIR}/stPaf.a ${stPafDependencies}
 	${CC} ${CPPFLAGS} ${CFLAGS} ${LDFLAGS} -o ${BINDIR}/stPafTests ${libTests} ${libSources} ${LIBDIR}/stPaf.a ${stCafLibs} ${LDLIBS}
 
-clean : 
+clean :
+	cd submodules/sonLib && ${MAKE} clean
 	rm -f *.o
 	rm -f ${LIBDIR}/stPaf.a ${BINDIR}/stPafTests ${BINDIR}/paf_chain ${BINDIR}/paf_invert ${BINDIR}/paf_tile ${BINDIR}/paf_trim ${BINDIR}/paf_shatter ${BINDIR}/paf_view ${BINDIR}/paf_dechunk ${BINDIR}/paf_dedupe ${BINDIR}/paf_to_bed ${BINDIR}/paf_upconvert ${BINDIR}/paf_add_mismatches
+
+test : all
+	${BINDIR}/stPafTests
