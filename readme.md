@@ -53,3 +53,8 @@ see tests/paf_pipeline_test.sh. The objective is to find chains
 of high-quality local alignments used to anchor the multiple sequence alignemnt
 process.
 
+# Todo
+
+Create a clean script for reproducing Cactus local alignment pipeline
+
+Improve docs
