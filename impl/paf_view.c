@@ -9,12 +9,11 @@
 */
 
 #include "paf.h"
-#include "inc/paf.h"
 #include <getopt.h>
 #include <time.h>
 #include "bioioC.h"
 
-void usage(void) {
+static void usage(void) {
     fprintf(stderr, "paf_view [fasta_files]xN [options], version 0.1\n");
     fprintf(stderr, "Pretty print PAF alignments\n");
     fprintf(stderr, "-i --inputFile : Input paf file to invert. If not specified reads from stdin\n");
@@ -30,7 +29,7 @@ void usage(void) {
     fprintf(stderr, "-h --help : Print this help message\n");
 }
 
-int main(int argc, char *argv[]) {
+int paf_view_main(int argc, char *argv[]) {
     time_t startTime = time(NULL);
 
     /*

@@ -26,31 +26,31 @@ lastz ${working_dir}/mPanPan1_XY_1_5000000.fa[multiple][nameparse=darkspace] ${w
 # Inverting so for every query:target alignment we have the mirror target:query alignment, this is used to
 # make alignments symmetric for chaining
 echo "Inverting"
-paf_invert -i ${working_dir}/lastz.paf > ${working_dir}/inverted.paf
+paffy invert -i ${working_dir}/lastz.paf > ${working_dir}/inverted.paf
 
 # Catting
 echo "Catting forward and inverted pafs"
 cat ${working_dir}/lastz.paf ${working_dir}/inverted.paf > ${working_dir}/combined.paf
 
-# Run paf_add_mismatches
+# Run paffy add_mismatches
 echo "Adding mismatches"
-paf_add_mismatches -i ${working_dir}/combined.paf ${working_dir}/*.fa > ${working_dir}/mismatches.paf
+paffy add_mismatches -i ${working_dir}/combined.paf ${working_dir}/*.fa > ${working_dir}/mismatches.paf
 
-# Run paf_trim
+# Run paffy trim
 echo "Trimming"
-paf_trim -i ${working_dir}/mismatches.paf > ${working_dir}/trimmed.paf
+paffy trim -i ${working_dir}/mismatches.paf > ${working_dir}/trimmed.paf
 
 # Removing mismatches
 echo "Removing mismatches"
-paf_add_mismatches -i ${working_dir}/trimmed.paf -a > ${working_dir}/trimmed_no_mismatches.paf
+paffy add_mismatches -i ${working_dir}/trimmed.paf -a > ${working_dir}/trimmed_no_mismatches.paf
 
-# Run paf_chain
+# Run paffy chain
 echo "Chaining"
-paf_chain -i ${working_dir}/trimmed_no_mismatches.paf > ${working_dir}/chained.paf
+paffy chain -i ${working_dir}/trimmed_no_mismatches.paf > ${working_dir}/chained.paf
 
-# Run paf_tile
+# Run paffy tile
 echo "Tiling"
-paf_tile -i ${working_dir}/chained.paf > ${working_dir}/tiled.paf
+paffy tile -i ${working_dir}/chained.paf > ${working_dir}/tiled.paf
 
 # Get primary alignments
 echo "Selecting primary alignments"
@@ -58,8 +58,8 @@ grep 'tp:A:P' ${working_dir}/tiled.paf > ${working_dir}/primary.paf
 
 # Add back the mismatches
 echo "Adding mismatches to the primary alignments"
-paf_add_mismatches -i ${working_dir}/primary.paf ${working_dir}/*.fa > ${working_dir}/primary_mismatches.paf
+paffy add_mismatches -i ${working_dir}/primary.paf ${working_dir}/*.fa > ${working_dir}/primary_mismatches.paf
 
 # Report stats on the primary alignments picked
 echo "Reporting stats on primary alignments and check aligned bases and identity are as expected"
-paf_view -i ${working_dir}/primary_mismatches.paf ${working_dir}/*.fa -s -t -u 0.98 -v 17400000
+paffy view -i ${working_dir}/primary_mismatches.paf ${working_dir}/*.fa -s -t -u 0.98 -v 17400000

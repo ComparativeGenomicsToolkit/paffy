@@ -19,38 +19,38 @@ wget https://raw.githubusercontent.com/UCSantaCruzComputationalGenomicsLab/cactu
 # Run lastz
 lastz ${working_dir}/*.fa --format=paf > ${working_dir}/output.paf
 
-# Run paf_view
+# Run paffy view
 echo "minimum local alignment identity"
-paf_view -i ${working_dir}/output.paf ${working_dir}/*.fa -s -t -u 0.74 -v 530000
+paffy view -i ${working_dir}/output.paf ${working_dir}/*.fa -s -t -u 0.74 -v 530000
 
-# Run paf_view with invert
-echo "paf_invert minimum local alignment identity"
-paf_invert -i ${working_dir}/output.paf | paf_view ${working_dir}/*.fa -s -t -u 0.74 -v 530000
+# Run paffy view with invert
+echo "paffy invert minimum local alignment identity"
+paffy invert -i ${working_dir}/output.paf | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 530000
 
-# Run paf_view with chain
-echo "paf_chain minimum local alignment identity"
-paf_chain -i ${working_dir}/output.paf | paf_view ${working_dir}/*.fa -s -t -u 0.74 -v 530000
+# Run paffy view with chain
+echo "paffy chain minimum local alignment identity"
+paffy chain -i ${working_dir}/output.paf | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 530000
 
-# Run paf_view with shatter
-echo "paf_shatter minimum local alignment identity (will be low as equal to worst run of matches)"
-paf_shatter -i ${working_dir}/output.paf | paf_view ${working_dir}/*.fa -s -t -u 0.74 -v 530000
+# Run paffy view with shatter
+echo "paffy shatter minimum local alignment identity (will be low as equal to worst run of matches)"
+paffy shatter -i ${working_dir}/output.paf | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 530000
 
-# Run paf_view with tile
-echo "paf_tile minimum local alignment identity"
-paf_tile -i ${working_dir}/output.paf | paf_view ${working_dir}/*.fa -s -t -u 0.74 -v 530000
+# Run paffy view with tile
+echo "paffy tile minimum local alignment identity"
+paffy tile -i ${working_dir}/output.paf | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 530000
 
-# Run paf_add_mismatches
+# Run paffy add_mismatches
 echo "adding mismatches"
-paf_add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paf_view ${working_dir}/*.fa -s -t -u 0.74 -v 530000
+paffy add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 530000
 
-# Run paf_add_mismatches
+# Run paffy add_mismatches
 echo "adding and then remove mismatches"
-paf_add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paf_add_mismatches -a | paf_view ${working_dir}/*.fa -s -t -u 0.74 -v 530000
+paffy add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paffy add_mismatches -a | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 530000
 
-# Run paf_view with trim (identity may be higher as we trim the tails)
-echo "paf_trim minimum local alignment identity"
-paf_add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paf_trim -r 0.05 | paf_view ${working_dir}/*.fa -s -t -u 0.74 -v 446000
+# Run paffy view with trim (identity may be higher as we trim the tails)
+echo "paffy trim minimum local alignment identity"
+paffy add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paffy trim -r 0.05 | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 446000
 
-# Run paf_view with trim (identity may be higher as we trim the tails)
-echo "paf_trim minimum local alignment identity, ignoring mismatches"
-paf_trim -r 0.95 -i ${working_dir}/output.paf | paf_view ${working_dir}/*.fa -s -t -u 0.74 -v 530000
+# Run paffy view with trim (identity may be higher as we trim the tails)
+echo "paffy trim minimum local alignment identity, ignoring mismatches"
+paffy trim -r 0.95 -i ${working_dir}/output.paf | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 530000

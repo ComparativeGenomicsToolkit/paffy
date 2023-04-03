@@ -15,7 +15,7 @@
 #include "sonLib.h"
 #include "paf.h"
 
-void usage(void) {
+static void usage(void) {
     fprintf(stderr, "paf_upconvert [fasta_file]xN [options], version 0.1\n");
     fprintf(stderr, "Converts the coordinates of paf alignments to refer to extracted subsequences.\n");
     fprintf(stderr, "-i --inFile : The input paf file. If omitted then reads pafs from stdin\n");
@@ -24,7 +24,7 @@ void usage(void) {
     fprintf(stderr, "-h --help : Print this help message\n");
 }
 
-void fastaRead_readCoordinates(void *sequences, const char *fastaHeader, const char *sequence, int64_t length) {
+static void fastaRead_readCoordinates(void *sequences, const char *fastaHeader, const char *sequence, int64_t length) {
     Interval *i = decode_fasta_header((char *)fastaHeader);
     i->end = i->start + strlen(sequence); // Get the length of the actual fragment
     st_logDebug("Adding sequence interval name: %s start:%" PRIi64 " end:%" PRIi64 " length: %" PRIi64 "\n",
@@ -32,7 +32,7 @@ void fastaRead_readCoordinates(void *sequences, const char *fastaHeader, const c
     stList_append((stList *)sequences, i);
 }
 
-int cmp_overlapping_intervals(const void *i, const void *j) {
+static int cmp_overlapping_intervals(const void *i, const void *j) {
     Interval *x = (Interval *)i, *y = (Interval *)j;
     int k = strcmp(x->name, y->name);
     //st_uglyf("Hello %s %s %" PRIi64 " %" PRIi64 " %" PRIi64 " %" PRIi64"\n", x->name, y->name, x->start, y->start, x->end, y->end);
@@ -49,7 +49,7 @@ int cmp_overlapping_intervals(const void *i, const void *j) {
     return 1;
 }
 
-void fix_interval(stList *intervals, char **name, int64_t *start, int64_t *end, int64_t *length) {
+static void fix_interval(stList *intervals, char **name, int64_t *start, int64_t *end, int64_t *length) {
     Interval qi; qi.name = *name; qi.start = *start; qi.end = *end;
 
     Interval *i = stList_binarySearch(intervals, &qi, cmp_overlapping_intervals);
@@ -68,7 +68,7 @@ void fix_interval(stList *intervals, char **name, int64_t *start, int64_t *end, 
     }
 }
 
-int main(int argc, char *argv[]) {
+int paf_upconvert_main(int argc, char *argv[]) {
     time_t startTime = time(NULL);
 
     /*

@@ -13,11 +13,10 @@
  */
 
 #include "paf.h"
-#include "inc/paf.h"
 #include <getopt.h>
 #include <time.h>
 
-void usage(void) {
+static void usage(void) {
     fprintf(stderr, "paf_tile [options], version 0.1\n");
     fprintf(stderr, "Tiles the records in the PAF file\n");
     fprintf(stderr, "-i --inputFile : Input paf file. If not specified reads from stdin\n");
@@ -26,7 +25,7 @@ void usage(void) {
     fprintf(stderr, "-h --help : Print this help message\n");
 }
 
-int paf_cmp_by_descending_score(const void *a, const void *b) {
+static int paf_cmp_by_descending_score(const void *a, const void *b) {
     Paf *p1 = (Paf *)a, *p2 = (Paf *)b;
     // Sort first by chain score, then if tied, sort by alignment score
     return p1->chain_score > p2->chain_score ? -1 : (p1->chain_score < p2->chain_score ? 1 :
@@ -34,7 +33,7 @@ int paf_cmp_by_descending_score(const void *a, const void *b) {
                                                      (p1->score < p2->score ? 1 : 0)));
 }
 
-int64_t get_median_alignment_level(uint16_t *counts, Paf *paf) {
+static int64_t get_median_alignment_level(uint16_t *counts, Paf *paf) {
     Cigar *c = paf->cigar;
     int64_t i = paf->query_start, max_level=0, matches=0;
     int64_t *level_counts = st_calloc(UINT16_MAX, sizeof(int64_t)); // An array of counts of the number of bases with the given alignment level
@@ -91,7 +90,7 @@ int64_t get_median_alignment_level(uint16_t *counts, Paf *paf) {
     return INT16_MAX;
 }
 
-int main(int argc, char *argv[]) {
+int paf_tile_main(int argc, char *argv[]) {
     time_t startTime = time(NULL);
 
     /*

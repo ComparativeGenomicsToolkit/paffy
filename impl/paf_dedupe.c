@@ -10,12 +10,11 @@
 */
 
 #include "paf.h"
-#include "inc/paf.h"
 #include <getopt.h>
 #include <time.h>
 #include "bioioC.h"
 
-void usage(void) {
+static void usage(void) {
     fprintf(stderr, "paf_dedupe [options], version 0.1\n");
     fprintf(stderr, "Pretty print PAF alignments\n");
     fprintf(stderr, "-i --inputFile : Input paf file to invert. If not specified reads from stdin\n");
@@ -25,7 +24,7 @@ void usage(void) {
     fprintf(stderr, "-h --help : Print this help message\n");
 }
 
-uint64_t paf_hash_key(const void *k) {
+static uint64_t paf_hash_key(const void *k) {
     Paf *p = (Paf *)k;
     uint64_t key = p->query_start + p->query_end + p->target_start + p->target_end;
     // Use the hash from <https://stackoverflow.com/a/12996028>
@@ -35,7 +34,7 @@ uint64_t paf_hash_key(const void *k) {
     return key ^ (key >> 31);
 }
 
-int paf_equal_key(const void *k, const void *k2) {
+static int paf_equal_key(const void *k, const void *k2) {
     Paf *p = (Paf *)k, *p2 = (Paf *)k2;
     return strcmp(p->query_name, p2->query_name) == 0
             && strcmp(p->target_name, p2->target_name) == 0
@@ -46,7 +45,7 @@ int paf_equal_key(const void *k, const void *k2) {
             && p->query_end == p2->query_end; // Pafs are equal if they have the same query and target coordinates.
 }
 
-int main(int argc, char *argv[]) {
+int paf_dedupe_main(int argc, char *argv[]) {
     time_t startTime = time(NULL);
 
     /*

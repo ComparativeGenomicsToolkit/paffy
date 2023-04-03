@@ -11,11 +11,10 @@
  */
 
 #include "paf.h"
-#include "inc/paf.h"
 #include <getopt.h>
 #include <time.h>
 
-void usage(void) {
+static void usage(void) {
     fprintf(stderr, "paf_to_bed [options], version 0.1\n");
     fprintf(stderr, "Creates a bed file representing the coverage of alignments on the query sequences of the paf alignments\n");
     fprintf(stderr, "-i --inputFile : Input paf file. If not specified reads from stdin\n");
@@ -29,7 +28,7 @@ void usage(void) {
     fprintf(stderr, "-h --help : Print this help message\n");
 }
 
-void write_bed(FILE *output, stHash *seq_names_to_alignment_count_arrays,
+static void write_bed(FILE *output, stHash *seq_names_to_alignment_count_arrays,
                bool binary, bool exclude_unaligned, bool exclude_aligned, int64_t min_size) {
     stHashIterator *it = stHash_getIterator(seq_names_to_alignment_count_arrays);
     char *seq_name;
@@ -53,7 +52,7 @@ void write_bed(FILE *output, stHash *seq_names_to_alignment_count_arrays,
     stHash_destructIterator(it);
 }
 
-int main(int argc, char *argv[]) {
+int paf_to_bed_main(int argc, char *argv[]) {
     time_t startTime = time(NULL);
 
     /*
