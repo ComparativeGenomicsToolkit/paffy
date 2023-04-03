@@ -26,7 +26,7 @@ ${sonLibDir}/sonLib.a : sonLib
 
 ${sonLibDir}/cuTest.a : sonLib
 
-${LIBDIR}/stPaf.a : ${libSources} ${libHeaders}  ${stPafDependencies}
+${LIBDIR}/stPaf.a : ${libSources} ${libHeaders}  ${stPafDependencies} | sonlib
 	${CC} ${CPPFLAGS} ${CFLAGS} ${LDFLAGS} -c ${libSources}
 	${AR} rc stPaf.a *.o
 	${RANLIB} stPaf.a
