@@ -27,7 +27,6 @@ wget https://raw.githubusercontent.com/ComparativeGenomicsToolkit/cactusTestData
 lastz ${working_dir}/mPanPan1_XY_1_5000000.fa[multiple][nameparse=darkspace] ${working_dir}/mPanTro3_XY_1_5000000.fa[multiple][nameparse=darkspace] --step=4 --ambiguous=iupac,100,100 --ydrop=3000 --format=paf:minimap2 > ${working_dir}/lastz.paf
 #lastz ${working_dir}/simCow.chr6.fa[multiple][nameparse=darkspace] ${working_dir}/simDog.chr6.fa[multiple][nameparse=darkspace] --step=4 --ambiguous=iupac,100,100 --ydrop=3000 --format=paf:minimap2 > ${working_dir}/lastz.paf
 
-
 # Inverting so for every query:target alignment we have the mirror target:query alignment, this is used to
 # make alignments symmetric for chaining
 echo "Inverting"
@@ -45,13 +44,9 @@ paffy add_mismatches -i ${working_dir}/combined.paf ${working_dir}/*.fa > ${work
 echo "Trimming"
 paffy trim -i ${working_dir}/mismatches.paf > ${working_dir}/trimmed.paf
 
-# Removing mismatches
-echo "Removing mismatches"
-paffy add_mismatches -i ${working_dir}/trimmed.paf -a > ${working_dir}/trimmed_no_mismatches.paf
-
 # Run paffy chain
 echo "Chaining"
-paffy chain -i ${working_dir}/trimmed_no_mismatches.paf > ${working_dir}/chained.paf
+paffy chain -i ${working_dir}/trimmed.paf > ${working_dir}/chained.paf
 
 # Run paffy tile
 echo "Tiling"
@@ -61,10 +56,6 @@ paffy tile -i ${working_dir}/chained.paf > ${working_dir}/tiled.paf
 echo "Selecting primary alignments"
 grep 'tp:A:P' ${working_dir}/tiled.paf > ${working_dir}/primary.paf
 
-# Add back the mismatches
-echo "Adding mismatches to the primary alignments"
-paffy add_mismatches -i ${working_dir}/primary.paf ${working_dir}/*.fa > ${working_dir}/primary_mismatches.paf
-
 # Report stats on the primary alignments picked
 echo "Reporting stats on primary alignments and check aligned bases and identity are as expected"
-paffy view -i ${working_dir}/primary_mismatches.paf ${working_dir}/*.fa -s -t -u 0.98 -v 17400000
+paffy view -i ${working_dir}/primary.paf ${working_dir}/*.fa -s -t -u 0.98 -v 17400000

@@ -414,7 +414,7 @@ int64_t paf_get_number_of_aligned_bases(Paf *paf) {
     int64_t aligned_bases = 0;
     Cigar *c = paf->cigar;
     while(c != NULL) {
-        if(c->op == match) {
+        if(c->op == match || c->op == sequence_match || c->op == sequence_mismatch) {
             aligned_bases += c->length;
         }
         c = c->next;
@@ -424,8 +424,8 @@ int64_t paf_get_number_of_aligned_bases(Paf *paf) {
 
 static Cigar *cigar_trim(int64_t *query_c, int64_t *target_c, Cigar *c, int64_t end_bases_to_trim, int q_sign, int t_sign) {
     int64_t bases_trimmed = 0;
-    while(c != NULL && (c->op != match || bases_trimmed < end_bases_to_trim)) {
-        if(c->op == match) { // can trim this alignment
+    while(c != NULL && ((c->op != match && c->op != sequence_match && c->op != sequence_mismatch) || bases_trimmed < end_bases_to_trim)) {
+        if(c->op == match || c->op == sequence_match || c->op == sequence_mismatch) { // can trim this alignment
             if(bases_trimmed + c->length > end_bases_to_trim) {
                 int64_t i = end_bases_to_trim - bases_trimmed;
                 c->length -= i;
@@ -570,7 +570,8 @@ void increase_alignment_level_counts(SequenceCountArray *seq_count_array, Paf *p
     int64_t i = paf->query_start;
     while(c != NULL) {
         if(c->op != query_delete) {
-            if(c->op == match) {
+            if(c->op != query_insert) { // Is some kind of match
+                assert(c->op == match || c->op == sequence_match || c->op == sequence_mismatch);
                 for(int64_t j=0; j<c->length; j++) {
                     assert(i + j < paf->query_end && i + j >= 0 && i + j < paf->query_length);
                     assert(i + j < seq_count_array->length);
@@ -699,7 +700,7 @@ void paf_remove_mismatches(Paf *paf) {
     while(c != NULL) {
         if(c->op == sequence_match || c->op == sequence_mismatch) {
             c->op = match; // relabel it a match
-            while(c->next != NULL && (c->next->op == sequence_match || c->next->op == sequence_mismatch)) { // remove any
+            while(c->next != NULL && (c->next->op == sequence_match || c->next->op == sequence_mismatch || c->next->op == match)) { // remove any
                 // mismatches / matches
                 Cigar *c2 = c->next;
                 c->length += c2->length;

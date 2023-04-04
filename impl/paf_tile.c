@@ -40,7 +40,8 @@ static int64_t get_median_alignment_level(uint16_t *counts, Paf *paf) {
     // such that level_counts[i] is the number of bases in the query with level_counts[i] number of alignments to it (at this point in the tiling)
     while(c != NULL) {
         if(c->op != query_delete) {
-            if(c->op == match) {
+            if(c->op != query_insert) { // is a match or mismatch, but not an insert in the query
+                assert(c->op == match || c->op == sequence_match || c->op == sequence_mismatch);
                 for(int64_t j=0; j<c->length; j++) {
                     assert(i + j < paf->query_end && i + j >= 0 && i + j < paf->query_length);
                     assert(counts[i + j] < UINT16_MAX); // paranoid check
