@@ -13,7 +13,7 @@
 
 static float trim_end_fraction = 1.0;
 static float trim_by_identity = 1;
-static float trim_by_identity_fraction = 0.2;
+static float trim_by_identity_fraction = 0.3;
 
 static void usage(void) {
      fprintf(stderr, "paf_trim [options], version 0.1\n");
@@ -21,9 +21,9 @@ static void usage(void) {
      fprintf(stderr, "-i --inputFile : Input paf file to invert. If not specified reads from stdin\n");
      fprintf(stderr, "-o --outputFile : Output paf file. If not specified outputs to stdout\n");
      fprintf(stderr, "-r --trimIdentity : Trim tails with\n"
-                     "alignment identity lower than this fraction of the overall alignment identity (from 0 to 1)\n"
-                     "If mismatches are not encoded in the cigar then identity is fraction of aligned\n"
-                     "bases, if mismatches in are encoded identity is fraction of aligned and matched bases\n");
+                     "alignment identity lower than this fraction of the overall alignment identity (from 0 to 1,\n"
+                     "by default: %f). If mismatches are not encoded in the cigar then identity is fraction of aligned\n"
+                     "bases, if mismatches in are encoded identity is fraction of aligned and matched bases.\n", trim_by_identity_fraction);
      fprintf(stderr, "-t --trimFraction : Fraction (from 0 to 1) of aligned bases to trim from each end of the \n"
                      "alignment (default:%f). If not --fixedTrim (see below) trimFraction is the \n"
                      "max fraction of the alignment to trim in each tail\n", trim_end_fraction);
