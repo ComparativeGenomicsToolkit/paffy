@@ -3,7 +3,9 @@
 This is a C and CLI library for manipulating/reading/writing 
 [Pairwise Alignment Format (PAF)](https://github.com/lh3/miniasm/blob/master/PAF.md).
 It is used by [Cactus](https://github.com/ComparativeGenomicsToolkit/cactus) in creating the 
-local, pairwise alignments between input sequences.
+local, pairwise alignments between input sequences. It also contains some utilities
+for manipulating [FASTA](https://www.ncbi.nlm.nih.gov/genbank/fastaformat/#:~:text=In%20FASTA%20format%20the%20line,should%20not%20contain%20any%20spaces.) 
+files.
 
 # Installing Paffy CLI/C Library
 
@@ -37,21 +39,32 @@ All Paffy utilities are run using `paffy <command>`, where the available command
     upconvert      Converts the coordinates of paf alignments to refer to extracted subsequences
 ```
 
+In addition the FASTA utilities are run using the `faffy <command>`, where the available commands are:
+```
+    chunk           Break a fasta file into smaller files for parallel computation
+    merge           Merge together fasta files, dealing with overlap (the inverse of chunk)
+    extract         Extract subsequences from a fasta file 
+```
+
 For example, to pretty print a PAF alignment:
 
     paffy view -i PAF_FILE [FASTA_FILES] -a
 
+To understand the chunking/dechunking code for fastas and pafs see the
+tests/faf_paf_chunking_test.sh.
+
 # Using C Library
 
-There is also a simple C library for working with taf/maf files. See paf.h in the
+There is also a simple C library for working with paf files. See paf.h in the
 inc directory.
 
 # Cactus Local Alignment Pipeline
 
 To understand the steps in the pairwise alignment pipeline used by Cactus
 see tests/paf_pipeline_test.sh. The objective is to find chains
-of high-quality local alignments used to anchor the multiple sequence alignemnt
+of high-quality local alignments used to anchor the multiple sequence alignment
 process.
+
 
 # Todo
 

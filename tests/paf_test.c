@@ -56,10 +56,16 @@ static void test_paf_pipeline(CuTest *testCase) {
     CuAssertTrue(testCase, st_system("./tests/paf_pipeline_test.sh") == 0);
 }
 
+static void test_faf_paf_chunking(CuTest *testCase) {
+    // Run the basic fasta chunking / paf dechunking pipeline
+    CuAssertTrue(testCase, st_system("./tests/faf_paf_chunking_test.sh") == 0);
+}
+
 CuSuite* addPafTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
     SUITE_ADD_TEST(suite, test_paf);
     SUITE_ADD_TEST(suite, test_paf_tools);
     SUITE_ADD_TEST(suite, test_paf_pipeline);
+    SUITE_ADD_TEST(suite, test_faf_paf_chunking);
     return suite;
 }

@@ -15,7 +15,7 @@
      fprintf(stderr, "paf_dechunk [options], version 0.1\n");
      fprintf(stderr, "Used in conjunction with fasta_chunk.\n"
                      "Modifies paf coordinates to remove the chunk coordinate name encoding created by fasta_chunk.\n");
-     fprintf(stderr, "-i --inputFile : Input paf file to invert. If not specified reads from stdin\n");
+     fprintf(stderr, "-i --inputFile : Input paf file to dechunk. If not specified reads from stdin\n");
      fprintf(stderr, "-o --outputFile : Output paf file. If not specified outputs to stdout\n");
      fprintf(stderr, "-l --logLevel : Set the log level\n");
      fprintf(stderr, "-h --help : Print this help message\n");

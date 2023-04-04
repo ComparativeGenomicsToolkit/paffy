@@ -10,7 +10,7 @@ stPafLibs = ${LDLIBS}
 
 all: all_libs all_progs
 all_libs: ${LIBDIR}/stPaf.a
-all_progs: all_libs ${BINDIR}/stPafTests ${BINDIR}/paffy
+all_progs: all_libs ${BINDIR}/paffyTests ${BINDIR}/paffy ${BINDIR}/faffy
 
 sonLib:
 	mkdir -p ${LIBDIR} ${BINDIR}
@@ -36,12 +36,15 @@ ${LIBDIR}/stPaf.a : ${libSources} ${libHeaders}  ${stPafDependencies}
 ${BINDIR}/paffy : paffy_main.c ${LIBDEPENDS} ${stPafDependencies} ${commonPafLibs} ${libHeaders}
 	${CC} ${CPPFLAGS} ${CFLAGS} -o ${BINDIR}/paffy paffy_main.c ${libSources} ${commonPafLibs} ${LDLIBS}
 
-${BINDIR}/stPafTests : ${libTests} ${LIBDIR}/stPaf.a ${stPafDependencies}
-	${CC} ${CPPFLAGS} ${CFLAGS} ${LDFLAGS} -o ${BINDIR}/stPafTests ${libTests} ${libSources} ${LIBDIR}/stPaf.a ${stCafLibs} ${LDLIBS}
+${BINDIR}/faffy : faffy_main.c ${LIBDEPENDS} ${commonPafLibs} ${libSources} ${libHeaders}
+	${CC} ${CPPFLAGS} ${CFLAGS} -o ${BINDIR}/faffy faffy_main.c ${libSources} ${commonPafLibs} ${LDLIBS}
+
+${BINDIR}/paffyTests : ${libTests} ${LIBDIR}/stPaf.a ${stPafDependencies}
+	${CC} ${CPPFLAGS} ${CFLAGS} ${LDFLAGS} -o ${BINDIR}/paffyTests ${libTests} ${libSources} ${LIBDIR}/stPaf.a ${stCafLibs} ${LDLIBS}
 
 clean :
 	cd submodules/sonLib && ${MAKE} clean
 	rm -rf *.o ${BINDIR} ${LIBDIR}
 
 test : all
-	${BINDIR}/stPafTests
+	${BINDIR}/paffyTests
