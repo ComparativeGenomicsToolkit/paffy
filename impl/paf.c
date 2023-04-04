@@ -207,7 +207,7 @@ char *paf_print(Paf *paf) {
         i += sprintf(buffer+i, "\tcg:Z:");
         Cigar *c = paf->cigar;
         while(c != NULL) {
-            char op_char = 'N';
+            char op_char = 'N'; // The N will never get used
             switch(c->op) {
                 case match:
                     op_char = 'M';
