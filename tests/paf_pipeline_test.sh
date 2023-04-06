@@ -14,7 +14,7 @@ working_dir=./temp_chains
 mkdir -p ${working_dir}
 
 # Make sure we cleanup the temp dir
-#trap "rm -rf ${working_dir}" EXIT
+trap "rm -rf ${working_dir}" EXIT
 
 # Get the sequences
 wget https://raw.githubusercontent.com/ComparativeGenomicsToolkit/cactusTestData/master/T2T_primate_PAR/mPanPan1_XY_1_5000000.fa -O ${working_dir}/mPanPan1_XY_1_5000000.fa
