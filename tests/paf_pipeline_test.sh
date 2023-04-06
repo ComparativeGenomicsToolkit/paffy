@@ -14,14 +14,13 @@ working_dir=./temp_chains
 mkdir -p ${working_dir}
 
 # Make sure we cleanup the temp dir
-trap "rm -rf ${working_dir}" EXIT
+#trap "rm -rf ${working_dir}" EXIT
 
 # Get the sequences
 wget https://raw.githubusercontent.com/ComparativeGenomicsToolkit/cactusTestData/master/T2T_primate_PAR/mPanPan1_XY_1_5000000.fa -O ${working_dir}/mPanPan1_XY_1_5000000.fa
 wget https://raw.githubusercontent.com/ComparativeGenomicsToolkit/cactusTestData/master/T2T_primate_PAR/mPanTro3_XY_1_5000000.fa -O ${working_dir}/mPanTro3_XY_1_5000000.fa
 #wget https://raw.githubusercontent.com/UCSantaCruzComputationalGenomicsLab/cactusTestData/master/evolver/mammals/loci1/simCow.chr6 -O ${working_dir}/simCow.chr6.fa
 #wget https://raw.githubusercontent.com/UCSantaCruzComputationalGenomicsLab/cactusTestData/master/evolver/mammals/loci1/simDog.chr6 -O ${working_dir}/simDog.chr6.fa
-
 
 # Run lastz
 lastz ${working_dir}/mPanPan1_XY_1_5000000.fa[multiple][nameparse=darkspace] ${working_dir}/mPanTro3_XY_1_5000000.fa[multiple][nameparse=darkspace] --step=4 --ambiguous=iupac,100,100 --ydrop=3000 --format=paf:minimap2 > ${working_dir}/lastz.paf
@@ -40,21 +39,21 @@ cat ${working_dir}/lastz.paf ${working_dir}/inverted.paf > ${working_dir}/combin
 echo "Adding mismatches"
 paffy add_mismatches -i ${working_dir}/combined.paf ${working_dir}/*.fa > ${working_dir}/mismatches.paf
 
-# Run paffy trim
-echo "Trimming"
-paffy trim -i ${working_dir}/mismatches.paf > ${working_dir}/trimmed.paf
-
 # Run paffy chain
 echo "Chaining"
-paffy chain -i ${working_dir}/trimmed.paf > ${working_dir}/chained.paf
+paffy chain -i ${working_dir}/mismatches.paf > ${working_dir}/chained.paf
 
 # Run paffy tile
 echo "Tiling"
 paffy tile -i ${working_dir}/chained.paf > ${working_dir}/tiled.paf
 
+# Run paffy trim
+echo "Trimming"
+paffy trim -i ${working_dir}/tiled.paf > ${working_dir}/trimmed.paf
+
 # Get primary alignments
 echo "Selecting primary alignments"
-grep 'tp:A:P' ${working_dir}/tiled.paf > ${working_dir}/primary.paf
+grep 'tp:A:P' ${working_dir}/trimmed.paf > ${working_dir}/primary.paf
 
 # Report stats on the primary alignments picked
 echo "Reporting stats on primary alignments and check aligned bases and identity are as expected"
