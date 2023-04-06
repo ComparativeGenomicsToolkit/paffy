@@ -16,14 +16,14 @@ static void test_fasta_chunk_and_merge(CuTest *testCase) {
     int64_t overlap = 10000;
 
     // Download a test sequence
-    st_system("wget https://glennhickey.s3.amazonaws.com/share/hg38_preprocessed_chr10.fa -O %s", test_fa_file);
+    CuAssertTrue(testCase, st_system("wget https://glennhickey.s3.amazonaws.com/share/hg38_preprocessed_chr10.fa -O %s", test_fa_file) == 0);
 
     // Run fasta chunk to get a list of chunks
-    st_system("faffy chunk --logLevel DEBUG %s -d %s -c %" PRIi64 " -o %" PRIi64 " > %s", test_fa_file, test_fasta_chunks_dir,
-              chunk_size, overlap, test_chunks_file);
+    CuAssertTrue(testCase, st_system("faffy chunk --logLevel DEBUG %s -d %s -c %" PRIi64 " -o %" PRIi64 " > %s", test_fa_file, test_fasta_chunks_dir,
+                                      chunk_size, overlap, test_chunks_file) == 0);
 
     // Run fasta merge to merge back a combined sequence file
-    st_system("faffy merge --logLevel DEBUG -i %s -o %s", test_chunks_file, test_dechunked_fa_file);
+    CuAssertTrue(testCase, st_system("faffy merge --logLevel DEBUG -i %s -o %s", test_chunks_file, test_dechunked_fa_file) == 0);
 
     // Check the sequences are equal
     FILE *fh = fopen(test_fa_file, "r"); stHash *seqs = fastaReadToMap(fh); fclose(fh);
@@ -42,7 +42,7 @@ static void test_fasta_chunk_and_merge(CuTest *testCase) {
     stHash_destruct(seqs2);
 
     // Cleanup
-    st_system("rm -rf %s %s %s %s", test_fa_file, test_fasta_chunks_dir, test_chunks_file, test_dechunked_fa_file);
+    CuAssertTrue(testCase, st_system("rm -rf %s %s %s %s", test_fa_file, test_fasta_chunks_dir, test_chunks_file, test_dechunked_fa_file) == 0);
 }
 
 CuSuite* addFastaChunkAndMergeTestSuite(void) {

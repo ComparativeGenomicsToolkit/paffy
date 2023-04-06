@@ -42,9 +42,13 @@ lastz ${working_dir}/mPanPan1_XY_1_5000000.fa[multiple][nameparse=darkspace] ${w
 echo "Dechunking"
 paffy dechunk -i ${working_dir}/lastz.paf > ${working_dir}/lastz_dechunked.paf
 
+# Remove dupes caused by overlaps
+echo "Deduping"
+paffy dedupe -i ${working_dir}/lastz_dechunked.paf > ${working_dir}/lastz_dechunked_dedupe.paf
+
 # Report stats on the alignments
-echo "Reporting stats on dechunked alignments and check aligned bases and identity are as expected"
-paffy view -i ${working_dir}/lastz_dechunked.paf ${working_dir}/*.fa -s -t -u 0.94 -v 22000000
+echo "Reporting stats on dechunked, deduped alignments and check aligned bases and identity are as expected"
+paffy view -i ${working_dir}/lastz_dechunked_dedupe.paf ${working_dir}/*.fa -s -t -u 0.94 -v 22000000
 
 # Report stats on the no chunk alignments
 echo "Reporting stats on no chunk alignments for comparison"

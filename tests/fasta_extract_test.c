@@ -68,7 +68,7 @@ static void test_fasta_extract(CuTest *testCase) {
                     seq_no, interval_no, total_bases);
 
         // Run fasta extract to get subsequences
-        st_system("faffy extract %s -i %s -o %s -f %" PRIi64 " --minSize %" PRIi64 "", test_fa_file, test_bed_file, test_out_file, flank, min_size);
+        CuAssertTrue(testCase, st_system("faffy extract %s -i %s -o %s -f %" PRIi64 " --minSize %" PRIi64 "", test_fa_file, test_bed_file, test_out_file, flank, min_size) == 0);
 
         // Parse extracted sequences and check that the sequences
         // correspond to the correct intervals
@@ -100,7 +100,7 @@ static void test_fasta_extract(CuTest *testCase) {
         stHash_destruct(sub_seqs);
         stHash_destruct(dna_strings);
         stHash_destruct(dna_strings_with_xs);
-        st_system("rm %s %s %s", test_fa_file, test_bed_file, test_out_file);
+        CuAssertTrue(testCase, st_system("rm %s %s %s", test_fa_file, test_bed_file, test_out_file) == 0);
     }
 }
 
