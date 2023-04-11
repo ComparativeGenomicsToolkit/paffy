@@ -1,5 +1,5 @@
 /*
- * fasta_chunk: Break a set of sequence files into a series of overlapping chunks
+ * faffy_chunk: Break a set of sequence files into a series of overlapping chunks
  * suitable for parallel computation.
  *
  * Released under the MIT license, see LICENSE.txt
@@ -24,7 +24,7 @@ static int64_t chunkRemaining; // must be initialized
 static char *tempChunkFile = NULL;
 
 static void usage(void) {
-    fprintf(stderr, "fasta_chunk [fasta_file]xN [options], version 0.1\n");
+    fprintf(stderr, "faffy chunk [fasta_file]xN [options], version 0.1\n");
     fprintf(stderr, "Breaks up a set of fasta sequences into a series of overlapping chunks, "
                     "printing the names of each chunk file to standard out.\n"
                     "To encode the chunking information each faster header is appended |x,"
@@ -94,7 +94,7 @@ static void processSequenceToChunk(void* dest, const char *fastaHeader, const ch
     }
 }
 
-int fasta_chunk_main(int argc, char *argv[]) {
+int faffy_chunk_main(int argc, char *argv[]) {
     time_t startTime = time(NULL);
 
     /*
@@ -190,7 +190,7 @@ int fasta_chunk_main(int argc, char *argv[]) {
     // Cleanup
     //////////////////////////////////////////////
 
-    st_logInfo("Fasta chunk is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
+    st_logInfo("Faffy chunk is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
 
     //while(1);
     //assert(0);

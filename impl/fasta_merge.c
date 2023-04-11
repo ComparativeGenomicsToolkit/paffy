@@ -1,5 +1,5 @@
 /*
- * fasta_chunk: Break a set of sequence files into a series of overlapping chunks
+ * faffy chunk: Break a set of sequence files into a series of overlapping chunks
  * suitable for parallel computation.
  *
  * Released under the MIT license, see LICENSE.txt
@@ -23,7 +23,7 @@
 #include "commonC.h"
 
 static void usage(void) {
-    fprintf(stderr, "fasta_merge [options], version 0.1\n");
+    fprintf(stderr, "faffy merge [options], version 0.1\n");
     fprintf(stderr, "Merges a series of fasta files, which may contain overlapping sequences, into a single fasta file\n");
     fprintf(stderr, "-i --inputFile : Input file containing names of fasta files to merge. If not specified reads from stdin\n");
     fprintf(stderr, "-o --outputFile : Output fasta file. If not specified outputs to stdout\n");
@@ -85,7 +85,7 @@ static void readFastaCallback(void* destination, const char *fastaHeader, const 
     stList_destruct(attributes);
 }
 
-int fasta_merge_main(int argc, char *argv[]) {
+int faffy_merge_main(int argc, char *argv[]) {
     time_t startTime = time(NULL);
 
     /*
@@ -173,7 +173,7 @@ int fasta_merge_main(int argc, char *argv[]) {
         fclose(output);
     }
 
-    st_logInfo("Fasta merge is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
+    st_logInfo("Faffy merge is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
 
     //while(1);
     //assert(0);

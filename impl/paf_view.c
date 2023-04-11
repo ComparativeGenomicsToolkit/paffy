@@ -1,5 +1,5 @@
 /*
- * paf_view: Pretty print pafs
+ * paffy view: Pretty print pafs
  *
  *  Released under the MIT license, see LICENSE.txt
  *
@@ -14,7 +14,7 @@
 #include "bioioC.h"
 
 static void usage(void) {
-    fprintf(stderr, "paf_view [fasta_files]xN [options], version 0.1\n");
+    fprintf(stderr, "paffy view [fasta_files]xN [options], version 0.1\n");
     fprintf(stderr, "Pretty print PAF alignments\n");
     fprintf(stderr, "-i --inputFile : Input paf file to invert. If not specified reads from stdin\n");
     fprintf(stderr, "-o --outputFile : Output paf file. If not specified outputs to stdout\n");
@@ -29,7 +29,14 @@ static void usage(void) {
     fprintf(stderr, "-h --help : Print this help message\n");
 }
 
-int paf_view_main(int argc, char *argv[]) {
+typedef struct _AlignmentStats {
+    float identity;
+    float identity_with_gaps;
+    int64_t score;
+    int64_t chain_score;
+} AlignmentStats;
+
+int paffy_view_main(int argc, char *argv[]) {
     time_t startTime = time(NULL);
 
     /*
@@ -198,7 +205,7 @@ int paf_view_main(int argc, char *argv[]) {
     }
     stHash_destruct(sequences);
 
-    st_logInfo("Paf view is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
+    st_logInfo("Paffy view is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
 
     //while(1);
     //assert(0);

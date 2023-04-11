@@ -1,5 +1,5 @@
 /*
- * fasta_extract: Extracts sequences from a fasta file according to a bed file.
+ * faffy extract: Extracts sequences from a fasta file according to a bed file.
  *
  * Released under the MIT license, see LICENSE.txt
  */
@@ -18,7 +18,7 @@ static int64_t flank = 10;
 static int64_t min_size = 100;
 
 static void usage(void) {
-    fprintf(stderr, "fasta_extract [fasta_file]xN [options], version 0.1\n");
+    fprintf(stderr, "faffy extract [fasta_file]xN [options], version 0.1\n");
     fprintf(stderr, "Extracts subsequences from a fasta file according to intervals in a bed file.\n"
                     "To encode the subsequence information each faster header is appended |x,"
                     "where x is the start coordinate (0-based) of the extracted sequence in the original sequence\n");
@@ -59,7 +59,7 @@ static int interval_cmp(Interval *i, Interval *j) {
     return k;
 }
 
-int fasta_extract_main(int argc, char *argv[]) {
+int faffy_extract_main(int argc, char *argv[]) {
     time_t startTime = time(NULL);
 
     /*
@@ -237,7 +237,7 @@ int fasta_extract_main(int argc, char *argv[]) {
         fclose(output);
     }
 
-    st_logInfo("Fasta extract is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
+    st_logInfo("Faffy extract is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
 
     //while(1);
     //assert(0);

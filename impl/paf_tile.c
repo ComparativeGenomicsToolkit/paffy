@@ -1,5 +1,5 @@
 /*
- * paf_tile: Greedily assign a "level" to each alignment, so that alignments with the lowest level are tesslating, high-scoring alignments.
+ * paffy tile: Greedily assign a "level" to each alignment, so that alignments with the lowest level are tesslating, high-scoring alignments.
  *
  * Released under the MIT license, see LICENSE.txt
  *
@@ -17,7 +17,7 @@
 #include <time.h>
 
 static void usage(void) {
-    fprintf(stderr, "paf_tile [options], version 0.1\n");
+    fprintf(stderr, "paffy tile [options], version 0.1\n");
     fprintf(stderr, "Tiles the records in the PAF file\n");
     fprintf(stderr, "-i --inputFile : Input paf file. If not specified reads from stdin\n");
     fprintf(stderr, "-o --outputFile : Output paf file. If not specified outputs to stdout\n");
@@ -91,7 +91,7 @@ static int64_t get_median_alignment_level(uint16_t *counts, Paf *paf) {
     return INT16_MAX;
 }
 
-int paf_tile_main(int argc, char *argv[]) {
+int paffy_tile_main(int argc, char *argv[]) {
     time_t startTime = time(NULL);
 
     /*
@@ -183,7 +183,7 @@ int paf_tile_main(int argc, char *argv[]) {
         fclose(output);
     }
 
-    st_logInfo("Paf tile is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
+    st_logInfo("Paffy tile is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
 
     //while(1);
     //assert(0);

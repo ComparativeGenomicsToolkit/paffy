@@ -1,5 +1,5 @@
 /*
- * paf_upconvert: Converts paf coordinates to refer to subsequences of the original sequences.
+ * paffy upconvert: Converts paf coordinates to refer to subsequences of the original sequences.
  *
  * Released under the MIT license, see LICENSE.txt
  */
@@ -16,7 +16,7 @@
 #include "paf.h"
 
 static void usage(void) {
-    fprintf(stderr, "paf_upconvert [fasta_file]xN [options], version 0.1\n");
+    fprintf(stderr, "paffy upconvert [fasta_file]xN [options], version 0.1\n");
     fprintf(stderr, "Converts the coordinates of paf alignments to refer to extracted subsequences.\n");
     fprintf(stderr, "-i --inFile : The input paf file. If omitted then reads pafs from stdin\n");
     fprintf(stderr, "-o --outFile : The output paf file. If omitted then pafs will be written to stdout\n");
@@ -68,7 +68,7 @@ static void fix_interval(stList *intervals, char **name, int64_t *start, int64_t
     }
 }
 
-int paf_upconvert_main(int argc, char *argv[]) {
+int paffy_upconvert_main(int argc, char *argv[]) {
     time_t startTime = time(NULL);
 
     /*

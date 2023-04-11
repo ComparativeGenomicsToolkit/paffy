@@ -1,5 +1,5 @@
 /*
- * paf_dechunk: Used with fasta_chunk, switches the coordinates of the pafs
+ * paffy dechunk: Used with fasta_chunk, switches the coordinates of the pafs
  * to use the original sequences passed into fasta_chunk.
  *
  * Released under the MIT license, see LICENSE.txt
@@ -12,7 +12,7 @@
 #include "sonLib.h"
 
  static void usage(void) {
-     fprintf(stderr, "paf_dechunk [options], version 0.1\n");
+     fprintf(stderr, "paffy dechunk [options], version 0.1\n");
      fprintf(stderr, "Used in conjunction with fasta_chunk.\n"
                      "Modifies paf coordinates to remove the chunk coordinate name encoding created by fasta_chunk.\n");
      fprintf(stderr, "-i --inputFile : Input paf file to dechunk. If not specified reads from stdin\n");
@@ -36,7 +36,7 @@ static void paf_dechunk(Paf *paf, bool fix_query, bool fix_target) {
      }
  }
 
-int paf_dechunk_main(int argc, char *argv[]) {
+int paffy_dechunk_main(int argc, char *argv[]) {
      time_t startTime = time(NULL);
 
      /*
@@ -126,7 +126,7 @@ int paf_dechunk_main(int argc, char *argv[]) {
          fclose(output);
      }
 
-     st_logInfo("Paf dechunk is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
+     st_logInfo("Paffy dechunk is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
 
      //while(1);
      //assert(0);

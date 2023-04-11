@@ -1,5 +1,5 @@
 /*
- * paf_trim: Trim bases from the prefix and suffix matches of a paf alignment
+ * paffy trim: Trim bases from the prefix and suffix matches of a paf alignment
  *   (1) Load local alignments file (PAF)
  *   (2) Trim prefix and suffix alignment, either a constant amount or according to an identity threshold.
  *   (3) Output local alignments file (PAF)
@@ -16,7 +16,7 @@ static float trim_by_identity = 1;
 static float trim_by_identity_fraction = 0.3;
 
 static void usage(void) {
-     fprintf(stderr, "paf_trim [options], version 0.1\n");
+     fprintf(stderr, "paffy trim [options], version 0.1\n");
      fprintf(stderr, "Trims the ends of a PAF file\n");
      fprintf(stderr, "-i --inputFile : Input paf file to invert. If not specified reads from stdin\n");
      fprintf(stderr, "-o --outputFile : Output paf file. If not specified outputs to stdout\n");
@@ -33,7 +33,7 @@ static void usage(void) {
      fprintf(stderr, "-h --help : Print this help message\n");
  }
 
- int paf_trim_main(int argc, char *argv[]) {
+ int paffy_trim_main(int argc, char *argv[]) {
      time_t startTime = time(NULL);
 
      /*
@@ -133,7 +133,7 @@ static void usage(void) {
          fclose(output);
      }
 
-     st_logInfo("Paf invert is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
+     st_logInfo("Paffy trim is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
 
      //while(1);
      //assert(0);

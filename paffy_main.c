@@ -8,17 +8,18 @@
 #include <getopt.h>
 #include <time.h>
 
-extern int paf_add_mismatches_main(int argc, char *argv[]);
-extern int paf_chain_main(int argc, char *argv[]);
-extern int paf_dechunk_main(int argc, char *argv[]);
-extern int paf_dedupe_main(int argc, char *argv[]);
-extern int paf_invert_main(int argc, char *argv[]);
-extern int paf_shatter_main(int argc, char *argv[]);
-extern int paf_tile_main(int argc, char *argv[]);
-extern int paf_to_bed_main(int argc, char *argv[]);
-extern int paf_trim_main(int argc, char *argv[]);
-extern int paf_upconvert_main(int argc, char *argv[]);
-extern int paf_view_main(int argc, char *argv[]);
+extern int paffy_add_mismatches_main(int argc, char *argv[]);
+extern int paffy_chain_main(int argc, char *argv[]);
+extern int paffy_dechunk_main(int argc, char *argv[]);
+extern int paffy_dedupe_main(int argc, char *argv[]);
+extern int paffy_invert_main(int argc, char *argv[]);
+extern int paffy_shatter_main(int argc, char *argv[]);
+extern int paffy_tile_main(int argc, char *argv[]);
+extern int paffy_to_bed_main(int argc, char *argv[]);
+extern int paffy_trim_main(int argc, char *argv[]);
+extern int paffy_upconvert_main(int argc, char *argv[]);
+extern int paffy_view_main(int argc, char *argv[]);
+extern int paffy_filter_main(int argc, char *argv[]);
 
 void usage(void) {
     fprintf(stderr, "paffy: toolkit for working with PAF files\n\n");
@@ -28,6 +29,7 @@ void usage(void) {
     fprintf(stderr, "    chain                    Chain together PAF alignments\n");
     fprintf(stderr, "    dechunk                  Manipulate coordinates to allow aggregation of PAFs computed over subsequences\n");
     fprintf(stderr, "    dedupe                   Remove duplicate alignments from a file based on exact query/target coordinates\n");
+    fprintf(stderr, "    filter                   Filter alignments based upon alignment stats\n");
     fprintf(stderr, "    invert                   Switch query and target coordinates\n");
     fprintf(stderr, "    shatter                  Break PAFs into sequence of gapless PAF alignments\n");
     fprintf(stderr, "    tile                     Give alignments levels, from lowest (best) to highest (worse) by greedily picking\n"
@@ -46,27 +48,29 @@ int main(int argc, char *argv[]) {
     }
 
     if (strcmp(argv[1], "add_mismatches") == 0) {
-        return paf_add_mismatches_main(argc - 1, argv + 1);
+        return paffy_add_mismatches_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "chain") == 0) {
-        return paf_chain_main(argc - 1, argv + 1);
+        return paffy_chain_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "dechunk") == 0) {
-        return paf_dechunk_main(argc - 1, argv + 1);
+        return paffy_dechunk_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "dedupe") == 0) {
-        return paf_dedupe_main(argc - 1, argv + 1);
+        return paffy_dedupe_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "invert") == 0) {
-        return paf_invert_main(argc - 1, argv + 1);
+        return paffy_invert_main(argc - 1, argv + 1);
+    }else if (strcmp(argv[1], "filter") == 0) {
+        return paffy_filter_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "shatter") == 0) {
-        return paf_shatter_main(argc - 1, argv + 1);
+        return paffy_shatter_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "tile") == 0) {
-        return paf_tile_main(argc - 1, argv + 1);
+        return paffy_tile_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "to_bed") == 0) {
-        return paf_to_bed_main(argc - 1, argv + 1);
+        return paffy_to_bed_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "trim") == 0) {
-        return paf_trim_main(argc - 1, argv + 1);
+        return paffy_trim_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "upconvert") == 0) {
-        return paf_upconvert_main(argc - 1, argv + 1);
+        return paffy_upconvert_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "view") == 0) {
-        return paf_view_main(argc - 1, argv + 1);
+        return paffy_view_main(argc - 1, argv + 1);
     } else {
         fprintf(stderr, "%s is not a valid paffy command\n", argv[1]);
         usage();

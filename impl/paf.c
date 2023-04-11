@@ -1,6 +1,5 @@
 #include "paf.h"
 #include <ctype.h>
-#include "../inc/paf.h"
 #include "bioioC.h"
 
 /*

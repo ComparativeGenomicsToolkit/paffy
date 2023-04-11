@@ -8,9 +8,9 @@
 #include <getopt.h>
 #include <time.h>
 
-extern int fasta_chunk_main(int argc, char *argv[]);
-extern int fasta_extract_main(int argc, char *argv[]);
-extern int fasta_merge_main(int argc, char *argv[]);
+extern int faffy_chunk_main(int argc, char *argv[]);
+extern int faffy_extract_main(int argc, char *argv[]);
+extern int faffy_merge_main(int argc, char *argv[]);
 
 void usage(void) {
     fprintf(stderr, "faffy: little toolkit for working with FASTA files\n\n");
@@ -29,11 +29,11 @@ int main(int argc, char *argv[]) {
     }
 
     if (strcmp(argv[1], "chunk") == 0) {
-        return fasta_chunk_main(argc - 1, argv + 1);
+        return faffy_chunk_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "merge") == 0) {
-        return fasta_merge_main(argc - 1, argv + 1);
+        return faffy_merge_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "extract") == 0) {
-        return fasta_extract_main(argc - 1, argv + 1);
+        return faffy_extract_main(argc - 1, argv + 1);
     } else {
         fprintf(stderr, "%s is not a valid faffy command\n", argv[1]);
         usage();

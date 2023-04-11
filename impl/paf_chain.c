@@ -1,5 +1,5 @@
 /*
- * paf_chain: Chain paf alignments
+ * paffy chain: Chain paf alignments
  *
  *  Released under the MIT license, see LICENSE.txt
  *
@@ -20,7 +20,7 @@ static int64_t chain_gap_open = 5000;
 static int64_t chain_gap_extend = 1;
 
 static void usage(void) {
-    fprintf(stderr, "paf_chain [options], version 0.1\n");
+    fprintf(stderr, "paffy chain [options], version 0.1\n");
     fprintf(stderr, "Chains the records in the PAF file into chains, rescoring them as chains.\nChains are indicated with the cn tag.\n");
     fprintf(stderr, "-i --inputFile : Input paf file to invert. If not specified reads from stdin\n");
     fprintf(stderr, "-o --outputFile : Output paf file. If not specified outputs to stdout\n");
@@ -44,7 +44,7 @@ static int64_t gap_cost(int64_t query_gap_length, int64_t target_gap_length, voi
     //return min_indel * 30 + 10 * diagonal_gap;
 }
 
-int paf_chain_main(int argc, char *argv[]) {
+int paffy_chain_main(int argc, char *argv[]) {
     time_t startTime = time(NULL);
 
     /*
@@ -147,7 +147,7 @@ int paf_chain_main(int argc, char *argv[]) {
         fclose(output);
     }
 
-    st_logInfo("Paf chain is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
+    st_logInfo("Paffy chain is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
 
     //while(1);
     //assert(0);

@@ -1,5 +1,5 @@
 /*
- * paf_to_bed: Creates a bed file representing the coverages of paf alignments.
+ * paffy to_bed: Creates a bed file representing the coverages of paf alignments.
  *
  * Released under the MIT license, see LICENSE.txt
  *
@@ -15,7 +15,7 @@
 #include <time.h>
 
 static void usage(void) {
-    fprintf(stderr, "paf_to_bed [options], version 0.1\n");
+    fprintf(stderr, "paffy to_bed [options], version 0.1\n");
     fprintf(stderr, "Creates a bed file representing the coverage of alignments on the query sequences of the paf alignments\n");
     fprintf(stderr, "-i --inputFile : Input paf file. If not specified reads from stdin\n");
     fprintf(stderr, "-o --outputFile : Output bed file. If not specified outputs to stdout\n");
@@ -52,7 +52,7 @@ static void write_bed(FILE *output, stHash *seq_names_to_alignment_count_arrays,
     stHash_destructIterator(it);
 }
 
-int paf_to_bed_main(int argc, char *argv[]) {
+int paffy_to_bed_main(int argc, char *argv[]) {
     time_t startTime = time(NULL);
 
     /*
@@ -169,7 +169,7 @@ int paf_to_bed_main(int argc, char *argv[]) {
         fclose(output);
     }
 
-    st_logInfo("Paf to bed is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
+    st_logInfo("Paffy to_bed is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
 
     //while(1);
     //assert(0);

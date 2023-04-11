@@ -53,8 +53,16 @@ paffy trim -i ${working_dir}/tiled.paf > ${working_dir}/trimmed.paf
 
 # Get primary alignments
 echo "Selecting primary alignments"
-grep 'tp:A:P' ${working_dir}/trimmed.paf > ${working_dir}/primary.paf
+paffy filter -i ${working_dir}/trimmed.paf -w 1  > ${working_dir}/primary.paf
+
+# Run paffy chain again, to rechain given just the primary alignments
+echo "Chaining primary alignments"
+paffy chain -i ${working_dir}/primary.paf > ${working_dir}/primary_chained.paf
+
+# Now filter out alignments in crappy primary chains
+echo "Selecting primary alignments in good chains"
+paffy filter -i ${working_dir}/primary_chained.paf -s 100000  > ${working_dir}/primary_final.paf
 
 # Report stats on the primary alignments picked
-echo "Reporting stats on primary alignments and check aligned bases and identity are as expected"
-paffy view -i ${working_dir}/primary.paf ${working_dir}/*.fa -s -t -u 0.98 -v 17400000
+echo "Reporting stats on primary alignments in good chains and check aligned bases and identity are as expected"
+paffy view -i ${working_dir}/primary_final.paf ${working_dir}/*.fa -s -t -u 0.98 -v 17400000

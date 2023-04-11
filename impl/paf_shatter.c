@@ -1,5 +1,5 @@
 /*
- * paf_shatter: Break up paf alignments into individual matches
+ * paffy shatter: Break up paf alignments into individual matches
  *
  *  Released under the MIT license, see LICENSE.txt
  *
@@ -13,7 +13,7 @@
 #include <time.h>
 
 static void usage(void) {
-    fprintf(stderr, "paf_shatter [options], version 0.1\n");
+    fprintf(stderr, "paffy shatter [options], version 0.1\n");
     fprintf(stderr, "Break up paf alignments into individual matches\n");
     fprintf(stderr, "-i --inputFile : Input paf file to invert. If not specified reads from stdin\n");
     fprintf(stderr, "-o --outputFile : Output paf file. If not specified outputs to stdout\n");
@@ -21,7 +21,7 @@ static void usage(void) {
     fprintf(stderr, "-h --help : Print this help message\n");
 }
 
-int paf_shatter_main(int argc, char *argv[]) {
+int paffy_shatter_main(int argc, char *argv[]) {
     time_t startTime = time(NULL);
 
     /*
@@ -103,7 +103,7 @@ int paf_shatter_main(int argc, char *argv[]) {
         fclose(output);
     }
 
-    st_logInfo("Paf shatter is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
+    st_logInfo("Paffy shatter is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
 
     //while(1);
     //assert(0);

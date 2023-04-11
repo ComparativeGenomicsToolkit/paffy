@@ -1,5 +1,5 @@
 /*
- * paf_dedupe: Remove duplicates from a paf file
+ * paffy dedupe: Remove duplicates from a paf file
  *
  *  Released under the MIT license, see LICENSE.txt
  *
@@ -15,7 +15,7 @@
 #include "bioioC.h"
 
 static void usage(void) {
-    fprintf(stderr, "paf_dedupe [options], version 0.1\n");
+    fprintf(stderr, "paffy dedupe [options], version 0.1\n");
     fprintf(stderr, "Pretty print PAF alignments\n");
     fprintf(stderr, "-i --inputFile : Input paf file to invert. If not specified reads from stdin\n");
     fprintf(stderr, "-o --outputFile : Output paf file. If not specified outputs to stdout\n");
@@ -45,7 +45,7 @@ static int paf_equal_key(const void *k, const void *k2) {
             && p->query_end == p2->query_end; // Pafs are equal if they have the same query and target coordinates.
 }
 
-int paf_dedupe_main(int argc, char *argv[]) {
+int paffy_dedupe_main(int argc, char *argv[]) {
     time_t startTime = time(NULL);
 
     /*
@@ -152,7 +152,7 @@ int paf_dedupe_main(int argc, char *argv[]) {
     }
     stHash_destruct(pafs);
 
-    st_logInfo("Paf dedupe is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
+    st_logInfo("Paffy dedupe is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
 
     //while(1);
     //assert(0);

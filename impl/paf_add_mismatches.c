@@ -1,5 +1,5 @@
 /*
- * paf_add_mismatches: Add match/mismatch encoding to a paf
+ * paffy add_mismatches: Add match/mismatch encoding to a paf
  *
  *  Released under the MIT license, see LICENSE.txt
  *
@@ -14,7 +14,7 @@
 #include "bioioC.h"
 
 static void usage(void) {
-    fprintf(stderr, "paf_add_mismatches [fasta_files]xN [options], version 0.1\n");
+    fprintf(stderr, "paffy add_mismatches [fasta_files]xN [options], version 0.1\n");
     fprintf(stderr, "Add mismatches to PAF alignments (so encoding X and = in place of M)\n");
     fprintf(stderr, "-i --inputFile : Input paf file to invert. If not specified reads from stdin\n");
     fprintf(stderr, "-o --outputFile : Output paf file. If not specified outputs to stdout\n");
@@ -23,7 +23,7 @@ static void usage(void) {
     fprintf(stderr, "-h --help : Print this help message\n");
 }
 
-int paf_add_mismatches_main(int argc, char *argv[]) {
+int paffy_add_mismatches_main(int argc, char *argv[]) {
     time_t startTime = time(NULL);
 
     /*
@@ -149,7 +149,7 @@ int paf_add_mismatches_main(int argc, char *argv[]) {
     }
     stHash_destruct(sequences);
 
-    st_logInfo("Paf remove mismatches is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
+    st_logInfo("Paffy add_mismatches is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
 
     //while(1);
     //assert(0);

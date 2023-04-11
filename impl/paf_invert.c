@@ -1,5 +1,5 @@
 /*
- * paf_invert: Reverse query/target of paf alignments
+ * paffy invert: Reverse query/target of paf alignments
  *
  * Released under the MIT license, see LICENSE.txt
  */
@@ -9,7 +9,7 @@
 #include <time.h>
 
 static void usage(void) {
-     fprintf(stderr, "paf_invert [options], version 0.1\n");
+     fprintf(stderr, "paffy invert [options], version 0.1\n");
      fprintf(stderr, "Inverts the query and target in a PAF file\n");
      fprintf(stderr, "-i --inputFile : Input paf file to invert. If not specified reads from stdin\n");
      fprintf(stderr, "-o --outputFile : Output paf file. If not specified outputs to stdout\n");
@@ -17,7 +17,7 @@ static void usage(void) {
      fprintf(stderr, "-h --help : Print this help message\n");
  }
 
- int paf_invert_main(int argc, char *argv[]) {
+ int paffy_invert_main(int argc, char *argv[]) {
      time_t startTime = time(NULL);
 
      /*
