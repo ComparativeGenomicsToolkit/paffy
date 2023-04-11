@@ -54,3 +54,11 @@ paffy add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paffy tr
 # Run paffy view with trim (identity may be higher as we trim the tails)
 echo "paffy trim minimum local alignment identity, ignoring mismatches"
 paffy trim -r 0.95 -i ${working_dir}/output.paf | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 530000
+
+# Run paffy view with filter
+echo "paffy filter removing alignments with score < than 10000"
+paffy filter -i ${working_dir}/output.paf -t 10000 | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 515000
+
+# Run paffy view with filter (inverted)
+echo "paffy filter removing alignments with score >= than 10000"
+paffy filter -i ${working_dir}/output.paf -t 10000 -x | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 15000

@@ -18,6 +18,7 @@ static void usage(void) {
      fprintf(stderr, "-u --minIdentity : Filter alignments with an identity less than this, exclude indels\n");
      fprintf(stderr, "-v --minIdentityWithGaps : Filter alignments with an identity less than this, including indels\n");
      fprintf(stderr, "-w --maxTileLevel : Filter alignments with a tile level greater than this\n");
+     fprintf(stderr, "-x --invert : Only output alignments that don't pass filters\n");
      fprintf(stderr, "-l --logLevel : Set the log level\n");
      fprintf(stderr, "-h --help : Print this help message\n");
  }
@@ -29,6 +30,7 @@ static void usage(void) {
      double min_identity = -1.0;
      double min_identity_with_gaps = -1.0;
      int64_t max_tile_level = -1;
+     bool invert = 0;
 
      /*
       * Arguments/options
@@ -50,11 +52,12 @@ static void usage(void) {
                                                  { "minIdentity", required_argument, 0, 'u' },
                                                  { "minIdentityWithGaps", required_argument, 0, 'v' },
                                                  { "maxTileLevel", required_argument, 0, 'w' },
+                                                 { "invert", no_argument, 0, 'x' },
                                                  { "help", no_argument, 0, 'h' },
                                                  { 0, 0, 0, 0 } };
 
          int option_index = 0;
-         int64_t key = getopt_long(argc, argv, "l:i:o:s:t:u:v:w:h", long_options, &option_index);
+         int64_t key = getopt_long(argc, argv, "l:i:o:s:t:u:v:w:xh", long_options, &option_index);
          if (key == -1) {
              break;
          }
@@ -84,6 +87,9 @@ static void usage(void) {
              case 'w':
                  max_tile_level = atoi(optarg);
                  break;
+             case 'x':
+                 invert = 1;
+                 break;
              case 'h':
                  usage();
                  return 0;
@@ -101,8 +107,8 @@ static void usage(void) {
      st_logInfo("Input file string : %s\n", inputFile);
      st_logInfo("Output file string : %s\n", outputFile);
      st_logInfo("Filtering paf with min chain score:%" PRIi64 " min alignment score:%" PRIi64
-                " min identity:%f min identity with gaps:%f max tile level:%" PRIi64 "\n", min_chain_score,
-                min_alignment_score, min_identity, min_identity_with_gaps, max_tile_level);
+                " min identity:%f min identity with gaps:%f max tile level:%" PRIi64 " invert:%s\n", min_chain_score,
+                min_alignment_score, min_identity, min_identity_with_gaps, max_tile_level, invert ? "True" : "False");
 
      //////////////////////////////////////////////
      // Filter the paf
@@ -123,12 +129,26 @@ static void usage(void) {
          if(paf->score >= min_alignment_score && paf->chain_score >= min_chain_score &&
             (max_tile_level == -1 || paf->tile_level <= max_tile_level) && identity >= min_identity &&
             identity_with_gaps >= min_identity_with_gaps) {
-             paf_write(paf, output);
+             if(invert) {
+                 if(st_getLogLevel() == debug) {
+                     st_logDebug("Filtering alignment with matches:%" PRIi64 ", identity: %f (%f with gaps), score: %" PRIi64
+                     ", chain-score:%" PRIi64 "\n", matches, identity, identity_with_gaps, paf->score, paf->chain_score);
+                     paf_write(paf, stderr);
+                 }
+             }
+             else {
+                 paf_write(paf, output);
+             }
          }
-         else if(st_getLogLevel() == debug) {
-             st_logDebug("Filtering alignment with matches:%" PRIi64 ", identity: %f (%f with gaps), score: %" PRIi64
-             ", chain-score:%" PRIi64 "\n", matches, identity, identity_with_gaps, paf->score, paf->chain_score);
-             paf_write(paf, stderr);
+         else {
+             if(invert) {
+                 paf_write(paf, output);
+             }
+             else if(st_getLogLevel() == debug) {
+                st_logDebug("Filtering alignment with matches:%" PRIi64 ", identity: %f (%f with gaps), score: %" PRIi64
+                 ", chain-score:%" PRIi64 "\n", matches, identity, identity_with_gaps, paf->score, paf->chain_score);
+                paf_write(paf, stderr);
+            }
          }
          paf_destruct(paf);
      }

@@ -51,13 +51,13 @@ paffy chain -i ${working_dir}/mismatches.paf > ${working_dir}/chained.paf
 echo "Tiling"
 paffy tile -i ${working_dir}/chained.paf > ${working_dir}/tiled.paf
 
-# Get primary alignments
-echo "Selecting primary alignments"
-paffy filter -i ${working_dir}/trimmed.paf -w 1  > ${working_dir}/primary.paf
-
 # Run paffy trim
 echo "Trimming"
 paffy trim -i ${working_dir}/tiled.paf > ${working_dir}/trimmed.paf
+
+# Get primary alignments
+echo "Selecting primary alignments"
+paffy filter -i ${working_dir}/trimmed.paf -w 1  > ${working_dir}/primary.paf
 
 # Report stats on the primary alignments before pruning
 echo "Reporting stats on primary alignments are as expected"
