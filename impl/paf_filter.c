@@ -113,22 +113,22 @@ static void usage(void) {
 
      Paf *paf;
      while((paf = paf_read(input)) != NULL) {
+         // Calculate identity stats
+         int64_t matches=0, mismatches=0, query_inserts=0, query_deletes=0,
+                 query_insert_bases=0, query_delete_bases=0;
+         paf_stats_calc(paf, &matches, &mismatches, &query_inserts,
+                        &query_deletes, &query_insert_bases, &query_delete_bases, 0);
+         double identity = (float)matches / (matches + mismatches);
+         double identity_with_gaps = (float)matches / (matches + mismatches + query_insert_bases + query_delete_bases);
          if(paf->score >= min_alignment_score && paf->chain_score >= min_chain_score &&
-                 (max_tile_level == -1 || paf->tile_level <= max_tile_level)) {
-             if(min_identity <= 0.0 && min_identity_with_gaps <= 0) { // Don't need to calculate identity
-                 paf_write(paf, output);
-             }
-             else { // Calculate identity stats
-                 int64_t matches=0, mismatches=0, query_inserts=0, query_deletes=0,
-                         query_insert_bases=0, query_delete_bases=0;
-                 paf_stats_calc(paf, &matches, &mismatches, &query_inserts,
-                                &query_deletes, &query_insert_bases, &query_delete_bases, 0);
-                 double identity = (float)matches / (matches + mismatches);
-                 double identity_with_gaps = (float)matches / (matches + mismatches + query_insert_bases + query_delete_bases);
-                 if(identity >= min_identity && identity_with_gaps >= min_identity_with_gaps) {
-                     paf_write(paf, output);
-                 }
-             }
+            (max_tile_level == -1 || paf->tile_level <= max_tile_level) && identity >= min_identity &&
+            identity_with_gaps >= min_identity_with_gaps) {
+             paf_write(paf, output);
+         }
+         else if(st_getLogLevel() == debug) {
+             st_logDebug("Filtering alignment with matches:%" PRIi64 ", identity: %f (%f with gaps), score: %" PRIi64
+             ", chain-score:%" PRIi64 "\n", matches, identity, identity_with_gaps, paf->score, paf->chain_score);
+             paf_write(paf, stderr);
          }
          paf_destruct(paf);
      }

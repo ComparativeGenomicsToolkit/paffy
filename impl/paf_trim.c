@@ -13,7 +13,7 @@
 
 static float trim_end_fraction = 1.0;
 static float trim_by_identity = 1;
-static float trim_by_identity_fraction = 0.3;
+static float trim_by_identity_fraction = 0.05;
 
 static void usage(void) {
      fprintf(stderr, "paffy trim [options], version 0.1\n");
@@ -114,7 +114,7 @@ static void usage(void) {
              paf_trim_unreliable_tails(paf, trim_by_identity_fraction, trim_end_fraction);
          }
          else {
-             paf_trim_end_fraction(paf, trim_end_fraction); // the invert routine
+             paf_trim_end_fraction(paf, trim_end_fraction); // just trim a constant amount
          }
 
          paf_check(paf);
