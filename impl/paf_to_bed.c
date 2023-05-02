@@ -152,6 +152,8 @@ int paffy_to_bed_main(int argc, char *argv[]) {
             seq_count_array = get_alignment_count_array(seq_names_to_alignment_count_arrays, paf);
             increase_alignment_level_counts(seq_count_array, paf);
         }
+
+        paf_destruct(paf); // Cleanup the old paf record
     }
 
     // Output local alignments file, sorted by score from best-to-worst
