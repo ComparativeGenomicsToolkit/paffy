@@ -179,6 +179,11 @@ typedef struct _sequenceCountArray {
 } SequenceCountArray;
 
 /*
+ * Cleanup a sequence count array
+ */
+void sequenceCountArray_destruct(SequenceCountArray *seq_count_array);
+
+/*
  * Get a count array for the query sequence of a paf record, creating one if it doesn't exist.
  */
 SequenceCountArray *get_alignment_count_array(stHash *seq_names_to_alignment_count_arrays, Paf *paf);
@@ -192,6 +197,11 @@ typedef struct _interval {
     char *name;
     int64_t start, end, length;
 } Interval;
+
+/*
+ * Cleanup an interval
+ */
+void interval_destruct(Interval *interval);
 
 /*
  * Decodes a fasta header into an interval.

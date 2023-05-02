@@ -139,7 +139,8 @@ int paffy_to_bed_main(int argc, char *argv[]) {
     FILE *output = outputFile == NULL ? stdout : fopen(outputFile, "w");
 
     // Create integer array representing counts of alignments to bases in the genome, setting values initially to 0.
-    stHash *seq_names_to_alignment_count_arrays = stHash_construct3(stHash_stringKey, stHash_stringEqualKey, NULL, free);
+    stHash *seq_names_to_alignment_count_arrays = stHash_construct3(stHash_stringKey, stHash_stringEqualKey,
+                                                                    NULL, (void (*)(void *))sequenceCountArray_destruct);
 
     // For each alignment: increase by one the aligned bases count of each base covered by the alignment.
     Paf *paf;

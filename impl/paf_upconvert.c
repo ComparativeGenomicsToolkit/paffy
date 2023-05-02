@@ -151,6 +151,8 @@ int paffy_upconvert_main(int argc, char *argv[]) {
         paf_check(paf); // Check all is okay
 
         paf_write(paf, output); // Write out the adjust paf
+
+        paf_destruct(paf); // Cleanup
     }
 
     //////////////////////////////////////////////

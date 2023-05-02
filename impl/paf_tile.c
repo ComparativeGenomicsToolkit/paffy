@@ -156,7 +156,8 @@ int paffy_tile_main(int argc, char *argv[]) {
     stList_sort(pafs, paf_cmp_by_descending_score); // Sort alignments by score, from best-to-worst
 
     // Create integer array representing counts of alignments to bases in the genome, setting values initially to 0.
-    stHash *seq_names_to_alignment_count_arrays = stHash_construct3(stHash_stringKey, stHash_stringEqualKey, NULL, free);
+    stHash *seq_names_to_alignment_count_arrays = stHash_construct3(stHash_stringKey, stHash_stringEqualKey,
+                                                                    NULL, (void (*)(void *))sequenceCountArray_destruct);
 
     // For each alignment: set the "level" of the alignment to q+1, increase by one the aligned bases count of each base covered by the alignment.
     for(int64_t i=0; i<stList_length(pafs); i++) {

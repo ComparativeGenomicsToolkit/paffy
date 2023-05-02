@@ -13,6 +13,9 @@ void paf_destruct(Paf *paf) {
         free(c);
         c = c2;
     }
+    // Cleanup names
+    free(paf->query_name);
+    free(paf->target_name);
     free(paf);
 }
 
@@ -549,6 +552,11 @@ stList *paf_shatter(Paf *paf) {
  * Functions used by paf_tile and paf_to_bed
  */
 
+void sequenceCountArray_destruct(SequenceCountArray *seq_count_array) {
+    free(seq_count_array->counts);
+    free(seq_count_array);
+}
+
 SequenceCountArray *get_alignment_count_array(stHash *seq_names_to_alignment_count_arrays, Paf *paf) {
     SequenceCountArray *seq_count_array = stHash_search(seq_names_to_alignment_count_arrays, paf->query_name);
     if(seq_count_array == NULL) { // If the counts have not been initialized yet
@@ -584,6 +592,11 @@ void increase_alignment_level_counts(SequenceCountArray *seq_count_array, Paf *p
         c = c->next;
     }
     assert(i == paf->query_end);
+}
+
+void interval_destruct(Interval *interval) {
+    free(interval->name);
+    free(interval);
 }
 
 Interval *decode_fasta_header(char *fasta_header) {
@@ -756,7 +769,9 @@ void paf_trim_upto(Paf *paf, Cigar *trim_upto) {
                 paf->query_end -= paf->cigar->length;
             }
         }
+        Cigar *c = paf->cigar;
         paf->cigar = paf->cigar->next;
+        free(c); // cleanup
     }
     assert(paf->cigar == trim_upto);
 }

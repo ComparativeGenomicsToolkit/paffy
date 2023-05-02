@@ -23,6 +23,7 @@
 
 static void convertCoordinatesP(char **contig, int64_t *start, int64_t *end, int64_t *length) {
     Interval *i = decode_fasta_header(*contig);
+    free(*contig);
     *contig = i->name; *start += i->start; *end += i->start; *length = i->length;
     free(i);
 }

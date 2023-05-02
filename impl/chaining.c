@@ -233,7 +233,7 @@ static stList *paf_chain_ignore_strand(stList *pafs, int64_t (*gap_cost)(int64_t
     }
 
     // Now finally convert chains back to single pafs
-    stList *output_pafs = stList_construct();
+    stList *output_pafs = stList_construct3(0, (void (*)(void *))paf_destruct);
     for(int64_t i=0; i<stList_length(outputChains); i++) {
         chain_to_pafs(stList_get(outputChains, i), gap_cost, gap_cost_params, output_pafs, (*chain_id)++);
     }
@@ -311,6 +311,8 @@ stList *paf_chain(stList *pafs, int64_t (*gap_cost)(int64_t, int64_t, void *), v
     // Cleanup
     stList_setDestructor(negative_chained_pafs, NULL);
     stList_destruct(negative_chained_pafs);
+    stList_destruct(positive_strand_pafs);
+    stList_destruct(negative_strand_pafs);
 
     // Remove the trim
     for(int64_t i=0; i<stList_length(positive_chained_pafs); i++) {
