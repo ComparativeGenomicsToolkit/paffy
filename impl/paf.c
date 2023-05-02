@@ -553,6 +553,7 @@ stList *paf_shatter(Paf *paf) {
  */
 
 void sequenceCountArray_destruct(SequenceCountArray *seq_count_array) {
+    free(seq_count_array->name);
     free(seq_count_array->counts);
     free(seq_count_array);
 }
@@ -561,10 +562,10 @@ SequenceCountArray *get_alignment_count_array(stHash *seq_names_to_alignment_cou
     SequenceCountArray *seq_count_array = stHash_search(seq_names_to_alignment_count_arrays, paf->query_name);
     if(seq_count_array == NULL) { // If the counts have not been initialized yet
         seq_count_array = st_calloc(1, sizeof(SequenceCountArray));
-        seq_count_array->name = paf->query_name;
+        seq_count_array->name = stString_copy(paf->query_name);
         seq_count_array->length = paf->query_length;
         seq_count_array->counts = st_calloc(paf->query_length, sizeof(uint16_t)); // sets all the counts to zero
-        stHash_insert(seq_names_to_alignment_count_arrays, paf->query_name, seq_count_array); // adds to the hash
+        stHash_insert(seq_names_to_alignment_count_arrays, seq_count_array->name, seq_count_array); // adds to the hash
     }
     else {
         assert(seq_count_array->length == paf->query_length); // Check the name is unique
