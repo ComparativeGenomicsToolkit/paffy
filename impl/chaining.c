@@ -268,7 +268,7 @@ stList *paf_chain(stList *pafs, int64_t (*gap_cost)(int64_t, int64_t, void *), v
     // Split into forward and reverse strand alignments
     stList *positive_strand_pafs = stList_construct();
     stList *negative_strand_pafs = stList_construct();
-    stHash *pafs_to_trims = stHash_construct2(NULL, (void (*)(void *))stIntTuple_destruct);
+    stHash *pafs_to_trims = stHash_construct();
     for(int64_t i=0; i<stList_length(pafs); i++) {
         Paf *p = stList_get(pafs, i);
         assert(percentage_to_trim >= 0 && percentage_to_trim <= 1.0);
@@ -286,7 +286,7 @@ stList *paf_chain(stList *pafs, int64_t (*gap_cost)(int64_t, int64_t, void *), v
         p->target_end -= trim;
 
         // Track how much was trimmed
-        stHash_insert(pafs_to_trims, p, stIntTuple_construct1(trim));
+        stHash_insert(pafs_to_trims, p, (void*)trim);
 
         if(p->same_strand) {
             stList_append(positive_strand_pafs, p);
@@ -319,7 +319,7 @@ stList *paf_chain(stList *pafs, int64_t (*gap_cost)(int64_t, int64_t, void *), v
         Paf *p = stList_get(positive_chained_pafs, i);
 
         assert(stHash_search(pafs_to_trims, p) != NULL);
-        int64_t trim = stIntTuple_get(stHash_search(pafs_to_trims, p), 0);
+        int64_t trim = (int64_t)stHash_search(pafs_to_trims, p);
 
         p->query_start -= trim;
         p->query_end += trim;
