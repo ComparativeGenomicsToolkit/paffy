@@ -59,9 +59,9 @@ typedef enum _cigarOp {
 
 typedef struct _cigar Cigar;
 struct _cigar {
-    CigarOp op;
-    int64_t length;
     Cigar *next;
+    int64_t length : 56;
+    int64_t op : 8;
 };
 
 typedef struct _paf {
@@ -73,7 +73,6 @@ typedef struct _paf {
     int64_t target_length;
     int64_t target_start; // Zero-based
     int64_t target_end; // Zero-based
-    bool same_strand; // If 0 then query substring is reverse complement with respect to the target
     Cigar *cigar; // Ordered by the target sequence
     int64_t score; // the dp alignment score
     int64_t mapping_quality;
@@ -83,6 +82,7 @@ typedef struct _paf {
     // chaining (somewhat like the nesting of chains within nets in ucsc chains and nets).
     int64_t chain_id; // a tag to indicate which chain a paf belongs to
     int64_t chain_score; // a tag to indicate the score the of chain the paf belongs to, uses s1 tag
+    bool same_strand; // If 0 then query substring is reverse complement with respect to the target    
     char type; // is 'P' primary / 'S' secondary / 'I' inversion
 } Paf;
 
