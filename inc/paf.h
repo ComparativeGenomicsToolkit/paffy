@@ -113,6 +113,11 @@ Paf *paf_parse(char *paf_string, bool parse_cigar_string);
 Paf *paf_read(FILE *fh, bool parse_cigar_string);
 
 /*
+ * Read a PAF alignment record from the given file. Returns NULL if no record available. Sets parse_cigar_string=1
+ */
+Paf *paf_read2(FILE *fh);
+
+/*
  * Prints a paf record
  */
 char *paf_print(Paf *paf);

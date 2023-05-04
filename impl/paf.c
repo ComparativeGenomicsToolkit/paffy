@@ -174,6 +174,10 @@ Paf *paf_read(FILE *fh, bool parse_cigar_string) {
     return paf;
 }
 
+Paf *paf_read2(FILE *fh) {
+    return paf_read(fh, 1);
+}
+
 int64_t cigar_number_of_records(Paf *paf) {
     int64_t i=0;
     Cigar *c = paf->cigar;
