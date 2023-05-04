@@ -125,7 +125,7 @@ int paffy_chain_main(int argc, char *argv[]) {
     FILE *input = inputFile == NULL ? stdin : fopen(inputFile, "r");
     FILE *output = outputFile == NULL ? stdout : fopen(outputFile, "w");
 
-    stList *pafs = read_pafs(input); // Load local alignments files (PAF)
+    stList *pafs = read_pafs(input, 0); // Load local alignments files (PAF), don't actually load the pafs
     stList *chained_pafs = paf_chain(pafs, gap_cost, NULL, max_gap_length, percentage_to_trim); // Convert to set of chains
 
     // Output chained alignments file

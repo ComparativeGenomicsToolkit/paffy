@@ -12,7 +12,7 @@ static void test_paf(CuTest *testCase) {
     // Read the pafs from the test file
     FILE *fh = fopen(test_paf_file, "r");
     assert(fh != NULL);
-    stList *pafs = read_pafs(fh);
+    stList *pafs = read_pafs(fh, 1);
     fclose(fh);
 
     // Check we have the right number of records / that they look okay
@@ -26,7 +26,7 @@ static void test_paf(CuTest *testCase) {
 
     // Read them back from the copied file
     fh = fopen(test_paf_2, "r");
-    stList *pafs2 = read_pafs(fh);
+    stList *pafs2 = read_pafs(fh, 1);
     fclose(fh);
     st_system("rm -f %s", test_paf_2); // Remove the copied file
 

@@ -272,12 +272,15 @@ stList *paf_chain(stList *pafs, int64_t (*gap_cost)(int64_t, int64_t, void *), v
     for(int64_t i=0; i<stList_length(pafs); i++) {
         Paf *p = stList_get(pafs, i);
         assert(percentage_to_trim >= 0 && percentage_to_trim <= 1.0);
-        int64_t aligned_bases = paf_get_number_of_aligned_bases(p);
-        int64_t trim = (aligned_bases * percentage_to_trim)/2.0;
+        int64_t max_query_trim = (p->query_end - p->query_start) * percentage_to_trim;
+        int64_t max_target_trim = (p->target_end - p->target_start) * percentage_to_trim;
+        assert(max_query_trim >= 0);
+        assert(max_target_trim >= 0);
+        int64_t trim = (max_query_trim < max_target_trim ? max_query_trim : max_target_trim)/2;
         assert(trim >= 0);
-        st_logDebug("For alignment of %" PRIi64 " query bases, %"
-        PRIi64 " target bases and %" PRIi64 " aligned bases trimming %" PRIi64 " bases from each paf end\n",
-                p->query_end - p->query_start, p->target_end - p->target_start, aligned_bases, trim);
+        st_logDebug("For alignment of %" PRIi64 " query bases, %" PRIi64 " target bases trimming %"
+                PRIi64 " bases from each paf end\n",
+                p->query_end - p->query_start, p->target_end - p->target_start, trim);
 
         // Trim the paf for chaining
         p->query_start += trim;

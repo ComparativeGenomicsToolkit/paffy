@@ -83,7 +83,7 @@ int paffy_shatter_main(int argc, char *argv[]) {
     FILE *output = outputFile == NULL ? stdout : fopen(outputFile, "w");
 
     Paf *paf;
-    while((paf = paf_read(input)) != NULL) {
+    while((paf = paf_read(input, 1)) != NULL) {
         stList *matches = paf_shatter(paf);
         for(int64_t i=0; i<stList_length(matches); i++) {
             paf_write(stList_get(matches, i), output);

@@ -118,7 +118,7 @@ static void usage(void) {
      FILE *output = outputFile == NULL ? stdout : fopen(outputFile, "w");
 
      Paf *paf;
-     while((paf = paf_read(input)) != NULL) {
+     while((paf = paf_read(input, 1)) != NULL) {
          // Calculate identity stats
          int64_t matches=0, mismatches=0, query_inserts=0, query_deletes=0,
                  query_insert_bases=0, query_delete_bases=0;

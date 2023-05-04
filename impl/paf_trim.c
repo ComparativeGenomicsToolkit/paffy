@@ -109,7 +109,7 @@ static void usage(void) {
      FILE *output = outputFile == NULL ? stdout : fopen(outputFile, "w");
 
      Paf *paf;
-     while((paf = paf_read(input)) != NULL) {
+     while((paf = paf_read(input, 1)) != NULL) {
          if(trim_by_identity) {
              paf_trim_unreliable_tails(paf, trim_by_identity_fraction, trim_end_fraction);
          }

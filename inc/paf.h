@@ -64,6 +64,16 @@ struct _cigar {
     int64_t op : 8;
 };
 
+/*
+ * Convert a cigar string into a linked list of cigar operations
+ */
+Cigar *cigar_parse(char *cigar_string);
+
+/*
+ * Cleanup a cigar linked list
+ */
+void cigar_destruct(Cigar *cigar);
+
 typedef struct _paf {
     char *query_name;
     int64_t query_length;
@@ -73,7 +83,8 @@ typedef struct _paf {
     int64_t target_length;
     int64_t target_start; // Zero-based
     int64_t target_end; // Zero-based
-    Cigar *cigar; // Ordered by the target sequence
+    Cigar *cigar; // Ordered by the target sequence, will be NULL if cigar_string is NULL
+    char *cigar_string; // The original cigar string, may be NULL if cigar is not NULL
     int64_t score; // the dp alignment score
     int64_t mapping_quality;
     int64_t num_matches;
@@ -94,12 +105,12 @@ void paf_destruct(Paf *paf);
 /*
  * Parse a paf from a string.
  */
-Paf *paf_parse(char *paf_string);
+Paf *paf_parse(char *paf_string, bool parse_cigar_string);
 
 /*
  * Read a PAF alignment record from the given file. Returns NULL if no record available.
  */
-Paf *paf_read(FILE *fh);
+Paf *paf_read(FILE *fh, bool parse_cigar_string);
 
 /*
  * Prints a paf record
@@ -135,7 +146,7 @@ void paf_invert(Paf *paf);
 /*
  * Read all the pafs from a file in order.
  */
-stList *read_pafs(FILE *paf_file);
+stList *read_pafs(FILE *paf_file, bool parse_cigar_string);
 
 /*
  * Write a list of pafs to a file in order.

@@ -6,12 +6,20 @@
  * Library functions for manipulating paf files.
  */
 
-void paf_destruct(Paf *paf) {
-    Cigar *c = paf->cigar;
-    while(c != NULL) { // Cleanup the individual cigar records
+void cigar_destruct(Cigar *c) {
+    while (c != NULL) { // Cleanup the individual cigar records
         Cigar *c2 = c->next;
         free(c);
         c = c2;
+    }
+}
+
+void paf_destruct(Paf *paf) {
+    if(paf->cigar_string) { // Cleanup the string representing the cigar ops if we are storing it
+        free(paf->cigar_string);
+    }
+    if(paf->cigar) { // cleanup the cigar as a linked list, if stored
+        cigar_destruct(paf->cigar);
     }
     // Cleanup names
     free(paf->query_name);
@@ -47,13 +55,14 @@ static Cigar *parse_cigar_record(char **c) {
         st_errAbort("Got an unexpected character paf cigar string: %c\n", t);
         break;
     }
-    (*c)[i] = ' ';
+    (*c)[i] = ' '; // This is just defensive, to put some white space around the integer being parsed
     cigar->length = atoll(*c);
+    (*c)[i] = t; // Now fix the original string
     *c = &((*c)[i+1]);
     return cigar;
 }
 
-static Cigar *parse_cigar(char *cigar_string) {
+Cigar *cigar_parse(char *cigar_string) {
     if(cigar_string[0] == '\0') { // If is the empty string
         return NULL;
     }
@@ -83,7 +92,7 @@ static Cigar *cigar_reverse(Cigar *c) {
     return c;
 }
 
-Paf *paf_parse(char *paf_string) {
+Paf *paf_parse(char *paf_string, bool parse_cigar_string) {
     Paf *paf = st_calloc(1, sizeof(Paf));
 
     stList *tokens = stString_split(paf_string); // Tokenize the record
@@ -127,7 +136,12 @@ Paf *paf_parse(char *paf_string) {
         } else if (strcmp(type, "AS") == 0) {
             paf->score = atoll(stList_get(tag, 2));
         } else if(strcmp(type, "cg") == 0) {
-            paf->cigar = parse_cigar(stList_get(tag, 2));
+            if(parse_cigar_string) {
+                paf->cigar = cigar_parse(stList_get(tag, 2));
+            }
+            else {
+                paf->cigar_string = stString_copy(stList_get(tag, 2)); // Initially just store the cigar string
+            }
         }
         else if(strcmp(type, "tl") == 0) {
             paf->tile_level = atoll(stList_get(tag, 2));
@@ -147,12 +161,12 @@ Paf *paf_parse(char *paf_string) {
     return paf;
 }
 
-Paf *paf_read(FILE *fh) {
+Paf *paf_read(FILE *fh, bool parse_cigar_string) {
     char *c = stFile_getLineFromFile(fh);
     if(c == NULL) {
         return NULL;
     }
-    Paf *paf = paf_parse(c);
+    Paf *paf = paf_parse(c, parse_cigar_string);
     free(c);
 
     paf_check(paf);
@@ -172,7 +186,8 @@ int64_t cigar_number_of_records(Paf *paf) {
 
 char *paf_print(Paf *paf) {
     // Generous estimate of size needed for each paf record.
-    int64_t buf_size = 12 * cigar_number_of_records(paf) + 140 + strlen(paf->query_name) + strlen(paf->target_name);
+    int64_t buf_size = 12 * cigar_number_of_records(paf) + 140 + strlen(paf->query_name) +
+            strlen(paf->target_name) + (paf->cigar_string != NULL ? strlen(paf->cigar_string) : 0);
     char *buffer = st_malloc(sizeof(char) * buf_size); // Giving a generous
     int64_t i = sprintf(buffer, "%s\t%" PRIi64 "\t%" PRIi64"\t%" PRIi64"\t%c\t%s\t%" PRIi64"\t%" PRIi64"\t%" PRIi64
                                 "\t%" PRIi64 "\t%" PRIi64 "\t%" PRIi64,
@@ -203,9 +218,9 @@ char *paf_print(Paf *paf) {
         i += sprintf(buffer+i, "\ts1:i:%" PRIi64, paf->chain_score);
     }
     if(i > buf_size) {
-        st_errAbort("Size of paf record exceeded buffer size\n");
+        st_errAbort("Size of paf record exceeded buffer size (1)\n");
     }
-    if(paf->cigar != NULL) {
+    if(paf->cigar) {
         i += sprintf(buffer+i, "\tcg:Z:");
         Cigar *c = paf->cigar;
         while(c != NULL) {
@@ -230,12 +245,15 @@ char *paf_print(Paf *paf) {
             i += sprintf(buffer+i, "%" PRIi64 "%c", c->length, op_char);
             c = c->next;
             if(i > buf_size) {
-                st_errAbort("Size of paf record exceeded buffer size\n");
+                st_errAbort("Size of paf record exceeded buffer size (2)\n");
             }
         }
     }
+    else if(paf->cigar_string) {
+        i += sprintf(buffer+i, "\tcg:Z:%s", paf->cigar_string);
+    }
     if(i > buf_size) {
-        st_errAbort("Size of paf record exceeded buffer size\n");
+        st_errAbort("Size of paf record exceeded buffer size (3)\n");
     }
     return buffer;
 }
@@ -396,10 +414,10 @@ void paf_invert(Paf *paf) {
     }
 }
 
-stList *read_pafs(FILE *fh) {
+stList *read_pafs(FILE *fh, bool parse_cigar_string) {
     stList *pafs = stList_construct3(0, (void (*)(void *))paf_destruct);
     Paf *paf;
-    while((paf = paf_read(fh)) != NULL) {
+    while((paf = paf_read(fh, parse_cigar_string)) != NULL) {
         paf_check(paf);
         stList_append(pafs, paf);
     }

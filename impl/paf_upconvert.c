@@ -143,7 +143,7 @@ int paffy_upconvert_main(int argc, char *argv[]) {
     FILE *input = paf_file == NULL ? stdin : fopen(paf_file, "r");
     FILE *output = output_file == NULL ? stdout : fopen(output_file, "w");
     Paf *paf;
-    while((paf = paf_read(input)) != NULL) {
+    while((paf = paf_read(input, 0)) != NULL) {
         // fix query and target coordinates
         fix_interval(intervals, &(paf->query_name), &(paf->query_start), &(paf->query_end), &(paf->query_length));
         fix_interval(intervals, &(paf->target_name), &(paf->target_start), &(paf->target_end), &(paf->target_length));

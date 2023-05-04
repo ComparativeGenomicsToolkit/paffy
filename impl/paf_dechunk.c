@@ -109,7 +109,7 @@ int paffy_dechunk_main(int argc, char *argv[]) {
      FILE *output = outputFile == NULL ? stdout : fopen(outputFile, "w");
 
      Paf *paf;
-     while((paf = paf_read(input)) != NULL) {
+     while((paf = paf_read(input, 1)) != NULL) {
          paf_dechunk(paf, fix_query, fix_target);
          paf_check(paf);
          paf_write(paf, output);

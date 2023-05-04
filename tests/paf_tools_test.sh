@@ -8,7 +8,11 @@ set -e
 # log the commands its running
 set -x
 
-working_dir=$(mktemp -d -t temp_chains-XXXXXXXXXX)
+# Make a working directory
+#working_dir=$(mktemp -d -t temp_chains-XXXXXXXXXX)
+working_dir=./temp_tools
+mkdir -p ${working_dir}
+
 # Make sure we cleanup the temp dir
 trap "rm -rf ${working_dir}" EXIT
 

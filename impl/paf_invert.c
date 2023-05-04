@@ -79,7 +79,7 @@ static void usage(void) {
      FILE *output = outputFile == NULL ? stdout : fopen(outputFile, "w");
 
      Paf *paf;
-     while((paf = paf_read(input)) != NULL) {
+     while((paf = paf_read(input, 1)) != NULL) {
          paf_invert(paf); // the invert routine
          paf_check(paf);
          paf_write(paf, output);

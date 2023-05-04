@@ -146,7 +146,7 @@ int paffy_view_main(int argc, char *argv[]) {
     total_query_insert_bases=0, total_query_delete_bases=0;
 
     Paf *paf;
-    while((paf = paf_read(input)) != NULL) {
+    while((paf = paf_read(input, 1)) != NULL) {
         // Get the query sequence
         char *query_seq = stHash_search(sequences, paf->query_name);
         if(query_seq == NULL) {

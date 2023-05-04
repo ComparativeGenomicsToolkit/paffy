@@ -152,7 +152,7 @@ int paffy_tile_main(int argc, char *argv[]) {
     FILE *input = inputFile == NULL ? stdin : fopen(inputFile, "r");
     FILE *output = outputFile == NULL ? stdout : fopen(outputFile, "w");
 
-    stList *pafs = read_pafs(input); // Load local alignments files (PAF)
+    stList *pafs = read_pafs(input, 0); // Load local alignments files (PAF)
     stList_sort(pafs, paf_cmp_by_descending_score); // Sort alignments by score, from best-to-worst
 
     // Create integer array representing counts of alignments to bases in the genome, setting values initially to 0.
@@ -162,10 +162,15 @@ int paffy_tile_main(int argc, char *argv[]) {
     // For each alignment: set the "level" of the alignment to q+1, increase by one the aligned bases count of each base covered by the alignment.
     for(int64_t i=0; i<stList_length(pafs); i++) {
         Paf *paf = stList_get(pafs, i);
+        assert(paf->cigar == NULL);
+        paf->cigar = cigar_parse(paf->cigar_string); // Convert the cigar string to a list of operations just for the duration
+        // of this loop
         SequenceCountArray *seq_count_array = get_alignment_count_array(seq_names_to_alignment_count_arrays, paf);
         increase_alignment_level_counts(seq_count_array, paf);
         paf->tile_level = get_median_alignment_level(seq_count_array->counts, paf); // Store the tile_level
         assert(paf->tile_level > 0); // Tile levels should start at 1
+        cigar_destruct(paf->cigar); // Clean up the memory hungry linked list
+        paf->cigar = NULL;
     }
 
     // Output local alignments file, sorted by score from best-to-worst

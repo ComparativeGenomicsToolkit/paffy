@@ -112,7 +112,7 @@ int paffy_dedupe_main(int argc, char *argv[]) {
     FILE *output = outputFile == NULL ? stdout : fopen(outputFile, "w");
     stHash *pafs = stHash_construct3(paf_hash_key, paf_equal_key, NULL, (void (*)(void *))paf_destruct);
     Paf *paf;
-    while((paf = paf_read(input)) != NULL) {
+    while((paf = paf_read(input, 0)) != NULL) {
         // Get the query sequence
         Paf *pPaf = stHash_search(pafs, paf);
         if(check_inverse && pPaf == NULL) { // In case we want to check if we already output the inverse
