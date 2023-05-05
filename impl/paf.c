@@ -246,7 +246,7 @@ char *paf_print(Paf *paf) {
                     op_char = 'X';
                     break;
             }
-            i += sprintf(buffer+i, "%" PRIi64 "%c", c->length, op_char);
+            i += sprintf(buffer+i, "%" PRIi64 "%c", (int64_t)c->length, op_char);
             c = c->next;
             if(i > buf_size) {
                 st_errAbort("Size of paf record exceeded buffer size (2)\n");
