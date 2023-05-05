@@ -190,9 +190,9 @@ int64_t cigar_number_of_records(Paf *paf) {
 
 char *paf_print(Paf *paf) {
     // Generous estimate of size needed for each paf record.
-    int64_t buf_size = 12 * cigar_number_of_records(paf) + 140 + strlen(paf->query_name) +
+    int64_t buf_size = 12 * cigar_number_of_records(paf) + 300 + strlen(paf->query_name) +
             strlen(paf->target_name) + (paf->cigar_string != NULL ? strlen(paf->cigar_string) : 0);
-    char *buffer = st_malloc(sizeof(char) * buf_size); // Giving a generous
+    char *buffer = st_malloc(sizeof(char) * buf_size); // Generate buffer
     int64_t i = sprintf(buffer, "%s\t%" PRIi64 "\t%" PRIi64"\t%" PRIi64"\t%c\t%s\t%" PRIi64"\t%" PRIi64"\t%" PRIi64
                                 "\t%" PRIi64 "\t%" PRIi64 "\t%" PRIi64,
                         paf->query_name, paf->query_length, paf->query_start, paf->query_end,
@@ -256,6 +256,7 @@ char *paf_print(Paf *paf) {
     else if(paf->cigar_string) {
         i += sprintf(buffer+i, "\tcg:Z:%s", paf->cigar_string);
     }
+    buffer[i++] = '\0'; // Add a string terminating character
     if(i > buf_size) {
         st_errAbort("Size of paf record exceeded buffer size (3)\n");
     }
