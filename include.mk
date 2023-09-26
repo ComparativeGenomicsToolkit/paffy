@@ -65,6 +65,7 @@ else
 		export avx2 = 1
 #		flags to include simde abpoa in cactus on X86
 		CFLAGS+= -mavx2
+	endif
 endif
 # flags needed to include simde abpoa in cactus on any architecture
 ifdef CACTUS_LEGACY_ARCH
