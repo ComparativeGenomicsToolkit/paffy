@@ -18,7 +18,7 @@
 
 static void usage(void) {
     fprintf(stderr, "paffy tile [options], version 0.1\n");
-    fprintf(stderr, "Tiles the records in the PAF file\n");
+    fprintf(stderr, "Tiles the records in the PAF file along the query sequence\n");
     fprintf(stderr, "-i --inputFile : Input paf file. If not specified reads from stdin\n");
     fprintf(stderr, "-o --outputFile : Output paf file. If not specified outputs to stdout\n");
     fprintf(stderr, "-l --logLevel : Set the log level\n");
