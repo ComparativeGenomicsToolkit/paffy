@@ -11,6 +11,7 @@
 #include <float.h>
 #include <getopt.h>
 #include <time.h>
+#include <ctype.h>
 #include "bioioC.h"
 #include "commonC.h"
 #include "sonLib.h"
@@ -84,6 +85,12 @@ static void processSequenceToChunk(void* dest, const char *fastaHeader, const ch
         // Get chunk sequence
         char *seq_chunk = stString_getSubString(sequence, i, j-i);
         assert(strlen(seq_chunk) == j - i);
+
+        // sanity check
+        for (int64_t k = 0; k < j-i; ++k) {
+            char c = tolower(seq_chunk[k]);
+            assert(c == 'a' || c == 'c' || c == 'g' || c == 't' || c == 'n');
+        }
 
         // print the sequence to the file
         fprintf(chunkFileHandle, "%s\n", seq_chunk);
