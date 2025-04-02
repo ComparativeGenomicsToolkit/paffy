@@ -76,8 +76,9 @@ static void processSequenceToChunk(void* dest, const char *fastaHeader, const ch
         // be ready to print more sequence
         startChunkingSequences();
 
-        // print the header to the file
-        fprintf(chunkFileHandle, ">%s|%" PRIi64 "|%" PRIi64 "\n", fastaHeader, sequenceLength, i);
+        // print the header to a buffer
+        char *header = st_calloc(strlen(fastaHeader) + 2048, sizeof(char));
+        sprintf(header, "%s|%" PRIi64 "|%" PRIi64, fastaHeader, sequenceLength, i);
 
         // Get end of chunk, including the extra overlap
         int64_t j = (i + chunkSize + chunkOverlapSize) <= sequenceLength ? (i + chunkSize + chunkOverlapSize) : sequenceLength;
@@ -93,8 +94,9 @@ static void processSequenceToChunk(void* dest, const char *fastaHeader, const ch
         }
 
         // print the sequence to the file
-        fprintf(chunkFileHandle, "%s\n", seq_chunk);
+        fastaWrite(seq_chunk, header, chunkFileHandle);
         free(seq_chunk); // cleanup the fragment
+        free(header);
 
         // update the remaining chunk
         updateChunkRemaining(j - i);
