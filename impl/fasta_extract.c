@@ -43,8 +43,11 @@ static void report_interval(FILE *output, char *seq_name, int64_t start, int64_t
         char c = tolower(s[i]);
         assert(c == 'a' || c == 'c' || c == 'g' || c == 't' || c == 'n');
     }
-    fprintf(output, ">%s|%" PRIi64 "|%" PRIi64 "\n%s\n", seq_name, seq_length, start, s);
+    char *header = st_calloc(strlen(seq_name) + 2048, sizeof(char));
+    sprintf(header, "%s|%" PRIi64 "|%" PRIi64, seq_name, seq_length, start);
+    fastaWrite(s, header, output);
     free(s);
+    free(header);
 }
 
 typedef struct _interval {
