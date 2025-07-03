@@ -34,10 +34,10 @@ ${LIBDIR}/stPaf.a : ${libSources} ${libHeaders}  ${stPafDependencies}
 	mv stPaf.a ${LIBDIR}/
 
 ${BINDIR}/paffy : paffy_main.c ${LIBDIR}/stPaf.a
-	${CC} ${CPPFLAGS} ${CFLAGS} -o ${BINDIR}/paffy paffy_main.c ${libSources} ${commonPafLibs} ${LDLIBS}
+	${CC} ${CPPFLAGS} ${CFLAGS} ${LDFLAGS} -o ${BINDIR}/paffy paffy_main.c ${libSources} ${commonPafLibs} ${LDLIBS}
 
 ${BINDIR}/faffy : faffy_main.c ${LIBDIR}/stPaf.a
-	${CC} ${CPPFLAGS} ${CFLAGS} -o ${BINDIR}/faffy faffy_main.c ${libSources} ${commonPafLibs} ${LDLIBS}
+	${CC} ${CPPFLAGS} ${CFLAGS} ${LDFLAGS} -o ${BINDIR}/faffy faffy_main.c ${libSources} ${commonPafLibs} ${LDLIBS}
 
 ${BINDIR}/paffyTests : ${libTests} ${LIBDIR}/stPaf.a
 	${CC} ${CPPFLAGS} ${CFLAGS} ${LDFLAGS} -o ${BINDIR}/paffyTests ${libTests} ${libSources} ${LIBDIR}/stPaf.a ${stCafLibs} ${LDLIBS}
