@@ -13,6 +13,7 @@
 #include "paf.h"
 #include <getopt.h>
 #include <time.h>
+#include "bioioC.h"
 
 static void usage(void) {
     fprintf(stderr, "paffy to_bed [options], version 0.1\n");
@@ -24,6 +25,7 @@ static void usage(void) {
     fprintf(stderr, "-f --excludeAligned : Exclude any interval with > 0 alignment coverage from the output\n");
     fprintf(stderr, "-m --minSize : Exclude any interval shorter than this length from the output\n");
     fprintf(stderr, "-n --includeInverted : Flip the alignments to include the target sequences also.\n");
+    fprintf(stderr, "-q --queryFastaFile: Query Fasta file (to include completely missing records with -f\n");
     fprintf(stderr, "-l --logLevel : Set the log level\n");
     fprintf(stderr, "-h --help : Print this help message\n");
 }
@@ -52,6 +54,18 @@ static void write_bed(FILE *output, stHash *seq_names_to_alignment_count_arrays,
     stHash_destructIterator(it);
 }
 
+typedef struct _map_file Map_File;
+struct _map_file {
+    stHash *map;
+    FILE *file;
+};
+
+static void write_missing_fasta_seqs(void* map_file, const char *name, const char *seq, int64_t length) {
+    if (stHash_search(((Map_File*)map_file)->map, (char*)name) == NULL) {
+        fprintf(((Map_File*)map_file)->file, "%s 0 %" PRIi64 "\t0\n", name, length);
+    }
+}
+
 int paffy_to_bed_main(int argc, char *argv[]) {
     time_t startTime = time(NULL);
 
@@ -66,6 +80,7 @@ int paffy_to_bed_main(int argc, char *argv[]) {
     bool exclude_aligned = 0;
     int64_t min_size = 1;
     bool include_inverted_alignments = 0;
+    char *query_fasta_file = NULL;
 
     ///////////////////////////////////////////////////////////////////////////
     // Parse the inputs
@@ -80,11 +95,12 @@ int paffy_to_bed_main(int argc, char *argv[]) {
                                                 { "excludeAligned", no_argument, 0, 'f' },
                                                 { "minSize", required_argument, 0, 'm' },
                                                 { "includeInverted", no_argument, 0, 'n' },
+                                                { "queryFastaFile", required_argument, 0, 'q' },
                                                 { "help", no_argument, 0, 'h' },
                                                 { 0, 0, 0, 0 } };
 
         int option_index = 0;
-        int64_t key = getopt_long(argc, argv, "l:i:o:hbefm:n", long_options, &option_index);
+        int64_t key = getopt_long(argc, argv, "l:i:o:hbefm:q:n", long_options, &option_index);
         if (key == -1) {
             break;
         }
@@ -114,6 +130,9 @@ int paffy_to_bed_main(int argc, char *argv[]) {
             case 'n':
                 include_inverted_alignments = 1;
                 break;
+            case 'q':
+                query_fasta_file = optarg;
+                break;
             case 'h':
                 usage();
                 return 0;
@@ -137,6 +156,7 @@ int paffy_to_bed_main(int argc, char *argv[]) {
 
     FILE *input = inputFile == NULL ? stdin : fopen(inputFile, "r");
     FILE *output = outputFile == NULL ? stdout : fopen(outputFile, "w");
+    FILE *query_fasta = query_fasta_file == NULL ? NULL : fopen(query_fasta_file, "r");
 
     // Create integer array representing counts of alignments to bases in the genome, setting values initially to 0.
     stHash *seq_names_to_alignment_count_arrays = stHash_construct3(stHash_stringKey, stHash_stringEqualKey,
@@ -160,6 +180,12 @@ int paffy_to_bed_main(int argc, char *argv[]) {
     // Output local alignments file, sorted by score from best-to-worst
     write_bed(output, seq_names_to_alignment_count_arrays, binary, exclude_unaligned, exclude_aligned, min_size);
 
+    // Output unaligned regions that are in the FASTA but not paf
+    if (exclude_aligned && query_fasta) {
+        Map_File mf = {seq_names_to_alignment_count_arrays, output};
+        fastaReadToFunction(query_fasta, (void*)&mf, write_missing_fasta_seqs);
+    }
+
     //////////////////////////////////////////////
     // Cleanup
     //////////////////////////////////////////////
@@ -171,6 +197,9 @@ int paffy_to_bed_main(int argc, char *argv[]) {
     if(outputFile != NULL) {
         fclose(output);
     }
+    if(query_fasta_file != NULL) {
+        fclose(query_fasta);
+    }      
 
     st_logInfo("Paffy to_bed is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);
 
