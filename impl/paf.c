@@ -423,7 +423,6 @@ stList *read_pafs(FILE *fh, bool parse_cigar_string) {
     stList *pafs = stList_construct3(0, (void (*)(void *))paf_destruct);
     Paf *paf;
     while((paf = paf_read(fh, parse_cigar_string)) != NULL) {
-        paf_check(paf);
         stList_append(pafs, paf);
     }
     return pafs;
