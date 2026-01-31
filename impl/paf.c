@@ -33,6 +33,20 @@ static inline char *int64_to_str(char *buf, int64_t val) {
     return buf;
 }
 
+// Fast string to int64 conversion - assumes valid input, no error checking
+static inline int64_t str_to_int64(const char *s) {
+    int64_t val = 0;
+    bool neg = false;
+    if (*s == '-') {
+        neg = true;
+        s++;
+    }
+    while (*s >= '0' && *s <= '9') {
+        val = val * 10 + (*s++ - '0');
+    }
+    return neg ? -val : val;
+}
+
 void cigar_destruct(Cigar *c) {
     while (c != NULL) { // Cleanup the individual cigar records
         Cigar *c2 = c->next;
@@ -83,7 +97,7 @@ static Cigar *parse_cigar_record(char **c) {
         break;
     }
     (*c)[i] = ' '; // This is just defensive, to put some white space around the integer being parsed
-    cigar->length = atoll(*c);
+    cigar->length = str_to_int64(*c);
     (*c)[i] = t; // Now fix the original string
     *c = &((*c)[i+1]);
     return cigar;
@@ -127,9 +141,9 @@ Paf *paf_parse(char *paf_string, bool parse_cigar_string) {
     // Get query coordinates
     paf->query_name = stList_get(tokens, 0);
     stList_set(tokens, 0, NULL); // Transfer ownership
-    paf->query_length = atoll(stList_get(tokens, 1));
-    paf->query_start = atoll(stList_get(tokens, 2));
-    paf->query_end = atoll(stList_get(tokens, 3));
+    paf->query_length = str_to_int64(stList_get(tokens, 1));
+    paf->query_start = str_to_int64(stList_get(tokens, 2));
+    paf->query_end = str_to_int64(stList_get(tokens, 3));
 
     // Is the alignment forward or reverse
     char strand = ((char *)stList_get(tokens, 4))[0];
@@ -141,14 +155,14 @@ Paf *paf_parse(char *paf_string, bool parse_cigar_string) {
     // Get target coordinates
     paf->target_name = stList_get(tokens, 5);
     stList_set(tokens, 5, NULL); // Transfer ownership
-    paf->target_length = atoll(stList_get(tokens, 6));
-    paf->target_start = atoll(stList_get(tokens, 7));
-    paf->target_end = atoll(stList_get(tokens, 8));
+    paf->target_length = str_to_int64(stList_get(tokens, 6));
+    paf->target_start = str_to_int64(stList_get(tokens, 7));
+    paf->target_end = str_to_int64(stList_get(tokens, 8));
 
     // Get the core alignment metric attributes of the record
-    paf->num_matches = atoll(stList_get(tokens, 9));
-    paf->num_bases = atoll(stList_get(tokens, 10));
-    paf->mapping_quality = atoll(stList_get(tokens, 11));
+    paf->num_matches = str_to_int64(stList_get(tokens, 9));
+    paf->num_bases = str_to_int64(stList_get(tokens, 10));
+    paf->mapping_quality = str_to_int64(stList_get(tokens, 11));
 
     // Set the following to default values to distinguish them from when they are initialized and 0
     paf->tile_level = -1;
@@ -163,7 +177,7 @@ Paf *paf_parse(char *paf_string, bool parse_cigar_string) {
             paf->type = ((char *)stList_get(tag, 2))[0];
             assert(paf->type == 'P' || paf->type == 'S' || paf->type == 'I');
         } else if (strcmp(type, "AS") == 0) {
-            paf->score = atoll(stList_get(tag, 2));
+            paf->score = str_to_int64(stList_get(tag, 2));
         } else if(strcmp(type, "cg") == 0) {
             if(parse_cigar_string) {
                 paf->cigar = cigar_parse(stList_get(tag, 2));
@@ -174,13 +188,13 @@ Paf *paf_parse(char *paf_string, bool parse_cigar_string) {
             }
         }
         else if(strcmp(type, "tl") == 0) {
-            paf->tile_level = atoll(stList_get(tag, 2));
+            paf->tile_level = str_to_int64(stList_get(tag, 2));
         }
         else if(strcmp(type, "cn") == 0) {
-            paf->chain_id = atoll(stList_get(tag, 2));
+            paf->chain_id = str_to_int64(stList_get(tag, 2));
         }
         else if(strcmp(type, "s1") == 0) {
-            paf->chain_score = atoll(stList_get(tag, 2));
+            paf->chain_score = str_to_int64(stList_get(tag, 2));
         }
         stList_destruct(tag);
     }
