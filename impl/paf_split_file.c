@@ -13,7 +13,10 @@ static void usage(void) {
      fprintf(stderr, "Split PAF file into separate output files by target contig name\n");
      fprintf(stderr, "-i --inputFile : Input paf file. If not specified reads from stdin\n");
      fprintf(stderr, "-p --prefix : Output file prefix (may include directory path). Default: split_\n");
-     fprintf(stderr, "-m --minTargetLength : Contigs with target_length < m go to <prefix>small.paf. Default: 0 (disabled)\n");
+     fprintf(stderr, "-m --minTargetLength : Contigs with target_length < m are grouped into combined files\n"
+                     "                      (<prefix>small_0.paf, <prefix>small_1.paf, ...) such that the total\n"
+                     "                      target length in each file does not exceed m. All alignments for a\n"
+                     "                      given contig go in exactly one file. Default: 0 (disabled)\n");
      fprintf(stderr, "-l --logLevel : Set the log level\n");
      fprintf(stderr, "-h --help : Print this help message\n");
  }
@@ -117,24 +120,39 @@ static FILE *get_output_file(stHash *target_to_file, const char *target_name, co
 
      FILE *input = inputFile == NULL ? stdin : fopen(inputFile, "r");
      stHash *target_to_file = stHash_construct3(stHash_stringKey, stHash_stringEqualKey, free, NULL);
-     FILE *small_file = NULL;
+
+     // For small contigs: map target_name -> FILE* so all alignments for a contig go to the same file
+     stHash *small_target_to_file = stHash_construct3(stHash_stringKey, stHash_stringEqualKey, free, NULL);
+     stList *small_files = stList_construct(); // list of FILE* for closing
+     FILE *current_small_file = NULL;
+     int64_t current_small_file_length = 0;
+     int64_t small_file_index = 0;
 
      Paf *paf;
      int64_t total_records = 0;
      while((paf = paf_read(input, 0)) != NULL) {
          FILE *output;
          if (minTargetLength > 0 && paf->target_length < minTargetLength) {
-             // Lazily open the small contigs file
-             if (small_file == NULL) {
-                 char *filename = stString_print("%ssmall.paf", prefix);
-                 small_file = fopen(filename, "w");
-                 if (small_file == NULL) {
-                     st_errAbort("Could not open output file: %s\n", filename);
+             // Check if this small contig already has an assigned file
+             output = stHash_search(small_target_to_file, paf->target_name);
+             if (output == NULL) {
+                 // New small contig - check if it fits in the current small file
+                 if (current_small_file == NULL || current_small_file_length + paf->target_length > minTargetLength) {
+                     // Start a new small file
+                     char *filename = stString_print("%ssmall_%" PRIi64 ".paf", prefix, small_file_index++);
+                     current_small_file = fopen(filename, "w");
+                     if (current_small_file == NULL) {
+                         st_errAbort("Could not open output file: %s\n", filename);
+                     }
+                     st_logInfo("Opened small contigs output file: %s\n", filename);
+                     free(filename);
+                     stList_append(small_files, current_small_file);
+                     current_small_file_length = 0;
                  }
-                 st_logInfo("Opened small contigs output file: %s\n", filename);
-                 free(filename);
+                 current_small_file_length += paf->target_length;
+                 stHash_insert(small_target_to_file, stString_copy(paf->target_name), current_small_file);
+                 output = current_small_file;
              }
-             output = small_file;
          } else {
              output = get_output_file(target_to_file, paf->target_name, prefix);
          }
@@ -161,9 +179,12 @@ static FILE *get_output_file(stHash *target_to_file, const char *target_name, co
      stHash_destructIterator(it);
      stHash_destruct(target_to_file);
 
-     if (small_file != NULL) {
-         fclose(small_file);
+     // Close all small contig output files
+     for (int64_t i = 0; i < stList_length(small_files); i++) {
+         fclose(stList_get(small_files, i));
      }
+     stList_destruct(small_files);
+     stHash_destruct(small_target_to_file);
 
      st_logInfo("Paffy split_file is done! Split %" PRIi64 " records, %" PRIi64 " seconds have elapsed\n",
                 total_records, time(NULL) - startTime);
