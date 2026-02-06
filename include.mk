@@ -35,9 +35,15 @@ ifndef TARGETOS
   TARGETOS := $(shell uname -s)
 endif
 
-# Hack to include openmp on os x after "brew install lomp
+# Hack to include openmp on os x after "brew install libomp"
 ifeq ($(TARGETOS), Darwin)
-	CFLAGS+= -Xpreprocessor -fopenmp -lomp
+	LIBOMP_PREFIX := $(shell brew --prefix libomp 2>/dev/null)
+	ifneq ($(LIBOMP_PREFIX),)
+		CFLAGS+= -I$(LIBOMP_PREFIX)/include -Xpreprocessor -fopenmp
+		LDLIBS+= -L$(LIBOMP_PREFIX)/lib -lomp
+	else
+		CFLAGS+= -Xpreprocessor -fopenmp -lomp
+	endif
 else
 	CFLAGS+= -fopenmp
 endif
@@ -48,6 +54,9 @@ ifeq ($(shell uname -m || true), aarch64)
 	arm=1
 endif
 ifeq ($(shell arch || true), aarch64)
+	arm=1
+endif
+ifeq ($(shell uname -m || true), arm64)
 	arm=1
 endif
 ifdef arm
