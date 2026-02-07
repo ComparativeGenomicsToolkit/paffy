@@ -10,6 +10,7 @@
 #include <float.h>
 #include <getopt.h>
 #include <time.h>
+#include <ctype.h>
 #include "bioioC.h"
 #include "commonC.h"
 #include "sonLib.h"
@@ -37,8 +38,16 @@ static void report_interval(FILE *output, char *seq_name, int64_t start, int64_t
     int64_t seq_length = (int64_t)stHash_search(sequenceLengths, seq_name);
     assert(0 <= start); assert(start <= end); assert(end <= seq_length);
     char *s = stString_getSubString(sequence, start, end-start);
-    fprintf(output, ">%s|%" PRIi64 "|%" PRIi64 "\n%s\n", seq_name, seq_length, start, s);
+    // sanity check
+    for (int64_t i = 0; i < end-start; ++i) {
+        char c = tolower(s[i]);
+        assert(c == 'a' || c == 'c' || c == 'g' || c == 't' || c == 'n');
+    }
+    char *header = st_calloc(strlen(seq_name) + 2048, sizeof(char));
+    sprintf(header, "%s|%" PRIi64 "|%" PRIi64, seq_name, seq_length, start);
+    fastaWrite(s, header, output);
     free(s);
+    free(header);
 }
 
 typedef struct _interval {

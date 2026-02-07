@@ -11,6 +11,7 @@
 #include <float.h>
 #include <getopt.h>
 #include <time.h>
+#include <ctype.h>
 #include "bioioC.h"
 #include "commonC.h"
 #include "sonLib.h"
@@ -75,8 +76,9 @@ static void processSequenceToChunk(void* dest, const char *fastaHeader, const ch
         // be ready to print more sequence
         startChunkingSequences();
 
-        // print the header to the file
-        fprintf(chunkFileHandle, ">%s|%" PRIi64 "|%" PRIi64 "\n", fastaHeader, sequenceLength, i);
+        // print the header to a buffer
+        char *header = st_calloc(strlen(fastaHeader) + 2048, sizeof(char));
+        sprintf(header, "%s|%" PRIi64 "|%" PRIi64, fastaHeader, sequenceLength, i);
 
         // Get end of chunk, including the extra overlap
         int64_t j = (i + chunkSize + chunkOverlapSize) <= sequenceLength ? (i + chunkSize + chunkOverlapSize) : sequenceLength;
@@ -85,9 +87,16 @@ static void processSequenceToChunk(void* dest, const char *fastaHeader, const ch
         char *seq_chunk = stString_getSubString(sequence, i, j-i);
         assert(strlen(seq_chunk) == j - i);
 
+        // sanity check
+        for (int64_t k = 0; k < j-i; ++k) {
+            char c = tolower(seq_chunk[k]);
+            assert(c == 'a' || c == 'c' || c == 'g' || c == 't' || c == 'n');
+        }
+
         // print the sequence to the file
-        fprintf(chunkFileHandle, "%s\n", seq_chunk);
+        fastaWrite(seq_chunk, header, chunkFileHandle);
         free(seq_chunk); // cleanup the fragment
+        free(header);
 
         // update the remaining chunk
         updateChunkRemaining(j - i);
