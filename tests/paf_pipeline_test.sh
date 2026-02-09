@@ -35,25 +35,44 @@ paffy invert -i ${working_dir}/lastz.paf > ${working_dir}/inverted.paf
 echo "Catting forward and inverted pafs"
 cat ${working_dir}/lastz.paf ${working_dir}/inverted.paf > ${working_dir}/combined.paf
 
-# Run paffy add_mismatches
-echo "Adding mismatches"
-paffy add_mismatches -i ${working_dir}/combined.paf ${working_dir}/*.fa > ${working_dir}/mismatches.paf
+# Split by query contig for parallel processing
+echo "Splitting by query contig"
+split_dir=${working_dir}/split
+mkdir -p ${split_dir}
+paffy split_file -q -i ${working_dir}/combined.paf -p ${split_dir}/
 
-# Report stats on the alignments with mismatches
-echo "Reporting stats on initial lastz alignments are as expected"
-paffy view -i ${working_dir}/mismatches.paf ${working_dir}/*.fa -s -t
+# List the parallel results
+echo "Split results"
+ls -l ${split_dir}
 
-# Run paffy chain
-echo "Chaining"
-paffy chain -i ${working_dir}/mismatches.paf > ${working_dir}/chained.paf
+# Run add_mismatches -> chain -> tile -> trim in parallel per query contig
+echo "Running add_mismatches -> chain -> tile -> trim in parallel"
+pids=()
+for split_file in ${split_dir}/*.paf; do
+    base=$(basename ${split_file} .paf)
+    out_dir=${working_dir}/parallel_${base}
+    mkdir -p ${out_dir}
+    (
+        set -eo pipefail
+        paffy add_mismatches -i ${split_file} ${working_dir}/*.fa \
+          | paffy chain \
+          | paffy tile \
+          | paffy trim > ${out_dir}/trimmed.paf
+    ) &
+    pids+=($!)
+done
+# Wait for all parallel jobs and fail if any failed
+for pid in "${pids[@]}"; do
+    wait ${pid}
+done
 
-# Run paffy tile
-echo "Tiling"
-paffy tile -i ${working_dir}/chained.paf > ${working_dir}/tiled.paf
+# Concatenate parallel results
+echo "Concatenating parallel results"
+cat ${working_dir}/parallel_*/trimmed.paf > ${working_dir}/trimmed.paf
 
-# Run paffy trim
-echo "Trimming"
-paffy trim -i ${working_dir}/tiled.paf > ${working_dir}/trimmed.paf
+# Report stats on the alignments after add_mismatches -> chain -> tile -> trim
+echo "Reporting stats on trimmed alignments are as expected"
+paffy view -i ${working_dir}/trimmed.paf ${working_dir}/*.fa -s -t
 
 # Get primary alignments
 echo "Selecting primary alignments"
