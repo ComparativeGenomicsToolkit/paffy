@@ -279,6 +279,90 @@ static void test_split_file_sanitize_filename(CuTest *testCase) {
     st_system("rm -f ./tests/temp_split_input.paf ./tests/temp_split_contig_scaffold_1.paf");
 }
 
+static void test_split_file_by_query(CuTest *testCase) {
+    // Write test PAF where multiple queries map to different targets
+    const char *input = "./tests/temp_split_input.paf";
+    const char *prefix = "./tests/temp_split_q_";
+    FILE *fh = fopen(input, "w");
+    assert(fh != NULL);
+    // q1 appears twice (to different targets)
+    fprintf(fh, "q1\t1000\t0\t50\t+\tchr1\t5000\t0\t50\t50\t50\t60\n");
+    fprintf(fh, "q1\t1000\t50\t100\t+\tchr2\t3000\t0\t50\t50\t50\t60\n");
+    // q2 appears once
+    fprintf(fh, "q2\t500\t0\t50\t+\tchr1\t5000\t100\t150\t50\t50\t60\n");
+    // q3 appears once
+    fprintf(fh, "q3\t200\t0\t50\t-\tchr3\t2000\t0\t50\t50\t50\t60\n");
+    fclose(fh);
+
+    // Run split_file with -q (split by query)
+    CuAssertTrue(testCase, st_system("./bin/paffy split_file -i %s -p %s -q", input, prefix) == 0);
+
+    // Verify files exist per query name
+    CuAssertTrue(testCase, file_exists("./tests/temp_split_q_q1.paf"));
+    CuAssertTrue(testCase, file_exists("./tests/temp_split_q_q2.paf"));
+    CuAssertTrue(testCase, file_exists("./tests/temp_split_q_q3.paf"));
+
+    // q1 should have 2 records
+    CuAssertIntEquals(testCase, 2, count_records("./tests/temp_split_q_q1.paf"));
+    CuAssertIntEquals(testCase, 1, count_records("./tests/temp_split_q_q2.paf"));
+    CuAssertIntEquals(testCase, 1, count_records("./tests/temp_split_q_q3.paf"));
+
+    // Verify query names in q1 file
+    fh = fopen("./tests/temp_split_q_q1.paf", "r");
+    stList *pafs = read_pafs(fh, 0);
+    fclose(fh);
+    for (int64_t i = 0; i < stList_length(pafs); i++) {
+        Paf *paf = stList_get(pafs, i);
+        CuAssertTrue(testCase, strcmp(paf->query_name, "q1") == 0);
+    }
+    stList_destruct(pafs);
+
+    // Cleanup
+    st_system("rm -f ./tests/temp_split_input.paf ./tests/temp_split_q_q1.paf "
+              "./tests/temp_split_q_q2.paf ./tests/temp_split_q_q3.paf");
+}
+
+static void test_split_file_by_query_min_length(CuTest *testCase) {
+    // Write test PAF with queries of varying lengths
+    const char *input = "./tests/temp_split_input.paf";
+    const char *prefix = "./tests/temp_split_qm_";
+    FILE *fh = fopen(input, "w");
+    assert(fh != NULL);
+    // big_q has length 2000 (above threshold)
+    fprintf(fh, "big_q\t2000\t0\t50\t+\tchr1\t5000\t0\t50\t50\t50\t60\n");
+    // small queries: sq1=300, sq2=200, sq3=400
+    fprintf(fh, "sq1\t300\t0\t50\t+\tchr2\t3000\t0\t50\t50\t50\t60\n");
+    fprintf(fh, "sq2\t200\t0\t50\t+\tchr3\t2000\t0\t50\t50\t50\t60\n");
+    fprintf(fh, "sq1\t300\t50\t100\t+\tchr1\t5000\t100\t150\t50\t50\t60\n");
+    fprintf(fh, "sq3\t400\t0\t50\t+\tchr1\t5000\t200\t250\t50\t50\t60\n");
+    fclose(fh);
+
+    // Run with -q -m 500
+    CuAssertTrue(testCase, st_system("./bin/paffy split_file -i %s -p %s -q -m 500", input, prefix) == 0);
+
+    // big_q gets its own file
+    CuAssertTrue(testCase, file_exists("./tests/temp_split_qm_big_q.paf"));
+    CuAssertIntEquals(testCase, 1, count_records("./tests/temp_split_qm_big_q.paf"));
+
+    // Small queries grouped: sq1(300)+sq2(200)=500<=500 -> small_0, sq3(400) -> small_1
+    CuAssertTrue(testCase, file_exists("./tests/temp_split_qm_small_0.paf"));
+    CuAssertTrue(testCase, file_exists("./tests/temp_split_qm_small_1.paf"));
+
+    // small_0 has sq1 (2 records) + sq2 (1 record) = 3
+    CuAssertIntEquals(testCase, 3, count_records("./tests/temp_split_qm_small_0.paf"));
+    // small_1 has sq3 (1 record)
+    CuAssertIntEquals(testCase, 1, count_records("./tests/temp_split_qm_small_1.paf"));
+
+    // No per-query files for small queries
+    CuAssertTrue(testCase, !file_exists("./tests/temp_split_qm_sq1.paf"));
+    CuAssertTrue(testCase, !file_exists("./tests/temp_split_qm_sq2.paf"));
+    CuAssertTrue(testCase, !file_exists("./tests/temp_split_qm_sq3.paf"));
+
+    // Cleanup
+    st_system("rm -f ./tests/temp_split_input.paf ./tests/temp_split_qm_big_q.paf "
+              "./tests/temp_split_qm_small_0.paf ./tests/temp_split_qm_small_1.paf");
+}
+
 CuSuite* addPafSplitFileTestSuite(void) {
     CuSuite* suite = CuSuiteNew();
     SUITE_ADD_TEST(suite, test_split_file_basic);
@@ -287,5 +371,7 @@ CuSuite* addPafSplitFileTestSuite(void) {
     SUITE_ADD_TEST(suite, test_split_file_empty_input);
     SUITE_ADD_TEST(suite, test_split_file_single_target);
     SUITE_ADD_TEST(suite, test_split_file_sanitize_filename);
+    SUITE_ADD_TEST(suite, test_split_file_by_query);
+    SUITE_ADD_TEST(suite, test_split_file_by_query_min_length);
     return suite;
 }
