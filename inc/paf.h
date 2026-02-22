@@ -118,6 +118,12 @@ Paf *paf_read(FILE *fh, bool parse_cigar_string);
 Paf *paf_read2(FILE *fh);
 
 /*
+ * Read a PAF alignment record from the given file. Returns NULL if no record available. Uses given string buffer to avoid
+ * malloc. Is not thread safe for the given file handle.
+ */
+Paf *paf_read_with_buffer(FILE *fh, bool parse_cigar_string, char **paf_buffer, int64_t *paf_length_buffer);
+
+/*
  * Prints a paf record
  */
 char *paf_print(Paf *paf);
@@ -137,6 +143,12 @@ void paf_pretty_print(Paf *paf, char *query_seq, char *target_seq, FILE *fh, boo
  * Writes a PAF alignment to the given file.
  */
 void paf_write(Paf *paf, FILE *fh);
+
+/*
+ * As paf_write, but using a provided buffer to avoid malloc.
+ */
+void paf_write_with_buffer(Paf *paf, FILE *fh, char **paf_buffer, int64_t *paf_length_buffer);
+
 
 /*
  * Checks a paf alignment coordinates and cigar are valid, error aborts if not.

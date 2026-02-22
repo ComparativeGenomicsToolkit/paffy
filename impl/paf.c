@@ -136,83 +136,91 @@ static Cigar *cigar_reverse(Cigar *c) {
 Paf *paf_parse(char *paf_string, bool parse_cigar_string) {
     Paf *paf = st_calloc(1, sizeof(Paf));
 
-    stList *tokens = stString_split(paf_string); // Tokenize the record
+    char *saveptr;
+    char *token;
 
-    // Get query coordinates
-    paf->query_name = stList_get(tokens, 0);
-    stList_set(tokens, 0, NULL); // Transfer ownership
-    paf->query_length = str_to_int64(stList_get(tokens, 1));
-    paf->query_start = str_to_int64(stList_get(tokens, 2));
-    paf->query_end = str_to_int64(stList_get(tokens, 3));
+    // Field 0: query_name (must copy — stored in Paf)
+    token = strtok_r(paf_string, "\t", &saveptr);
+    paf->query_name = stString_copy(token);
 
-    // Is the alignment forward or reverse
-    char strand = ((char *)stList_get(tokens, 4))[0];
+    // Fields 1-3: query_length, query_start, query_end
+    paf->query_length = str_to_int64(strtok_r(NULL, "\t", &saveptr));
+    paf->query_start = str_to_int64(strtok_r(NULL, "\t", &saveptr));
+    paf->query_end = str_to_int64(strtok_r(NULL, "\t", &saveptr));
+
+    // Field 4: strand
+    token = strtok_r(NULL, "\t", &saveptr);
+    char strand = token[0];
     if(strand != '+' && strand != '-') {
-        st_errAbort("Got an unexpected strand character (%c) in a paf string: %s\n", strand, paf_string);
+        st_errAbort("Got an unexpected strand character (%c) in a paf string\n", strand);
     }
     paf->same_strand = strand == '+';
 
-    // Get target coordinates
-    paf->target_name = stList_get(tokens, 5);
-    stList_set(tokens, 5, NULL); // Transfer ownership
-    paf->target_length = str_to_int64(stList_get(tokens, 6));
-    paf->target_start = str_to_int64(stList_get(tokens, 7));
-    paf->target_end = str_to_int64(stList_get(tokens, 8));
+    // Field 5: target_name (must copy — stored in Paf)
+    token = strtok_r(NULL, "\t", &saveptr);
+    paf->target_name = stString_copy(token);
 
-    // Get the core alignment metric attributes of the record
-    paf->num_matches = str_to_int64(stList_get(tokens, 9));
-    paf->num_bases = str_to_int64(stList_get(tokens, 10));
-    paf->mapping_quality = str_to_int64(stList_get(tokens, 11));
+    // Fields 6-8: target_length, target_start, target_end
+    paf->target_length = str_to_int64(strtok_r(NULL, "\t", &saveptr));
+    paf->target_start = str_to_int64(strtok_r(NULL, "\t", &saveptr));
+    paf->target_end = str_to_int64(strtok_r(NULL, "\t", &saveptr));
+
+    // Fields 9-11: num_matches, num_bases, mapping_quality
+    paf->num_matches = str_to_int64(strtok_r(NULL, "\t", &saveptr));
+    paf->num_bases = str_to_int64(strtok_r(NULL, "\t", &saveptr));
+    paf->mapping_quality = str_to_int64(strtok_r(NULL, "\t", &saveptr));
 
     // Set the following to default values to distinguish them from when they are initialized and 0
     paf->tile_level = -1;
     paf->chain_id = -1;
     paf->chain_score = -1;
 
-    // Parse the remaining optional tags
-    for(int64_t i=12; i<stList_length(tokens); i++) {
-        stList *tag = stString_splitByString(stList_get(tokens, i), ":");
-        char *type = stList_get(tag, 0);
-        if(strcmp(type, "tp") == 0) {
-            paf->type = ((char *)stList_get(tag, 2))[0];
-            assert(paf->type == 'P' || paf->type == 'S' || paf->type == 'I');
-        } else if (strcmp(type, "AS") == 0) {
-            paf->score = str_to_int64(stList_get(tag, 2));
-        } else if(strcmp(type, "cg") == 0) {
-            if(parse_cigar_string) {
-                paf->cigar = cigar_parse(stList_get(tag, 2));
-            }
-            else {
-                paf->cigar_string = stList_get(tag, 2); // Transfer ownership
-                stList_set(tag, 2, NULL);
-            }
+    // Parse optional tags — format is always XX:T:value
+    // Direct character indexing avoids stString_splitByString overhead
+    while((token = strtok_r(NULL, "\t", &saveptr)) != NULL) {
+        if(token[2] != ':' || token[4] != ':') {
+            continue; // Skip malformed tags
         }
-        else if(strcmp(type, "tl") == 0) {
-            paf->tile_level = str_to_int64(stList_get(tag, 2));
-        }
-        else if(strcmp(type, "cn") == 0) {
-            paf->chain_id = str_to_int64(stList_get(tag, 2));
-        }
-        else if(strcmp(type, "s1") == 0) {
-            paf->chain_score = str_to_int64(stList_get(tag, 2));
-        }
-        stList_destruct(tag);
-    }
+        char tag0 = token[0], tag1 = token[1];
+        char *value = token + 5;
 
-    // Cleanup
-    stList_destruct(tokens);
+        if(tag0 == 't' && tag1 == 'p') {
+            paf->type = value[0];
+            assert(paf->type == 'P' || paf->type == 'S' || paf->type == 'I');
+        } else if(tag0 == 'A' && tag1 == 'S') {
+            paf->score = str_to_int64(value);
+        } else if(tag0 == 'c' && tag1 == 'g') {
+            if(parse_cigar_string) {
+                paf->cigar = cigar_parse(value);
+            } else {
+                paf->cigar_string = stString_copy(value);
+            }
+        } else if(tag0 == 't' && tag1 == 'l') {
+            paf->tile_level = str_to_int64(value);
+        } else if(tag0 == 'c' && tag1 == 'n') {
+            paf->chain_id = str_to_int64(value);
+        } else if(tag0 == 's' && tag1 == '1') {
+            paf->chain_score = str_to_int64(value);
+        }
+    }
 
     return paf;
 }
 
-Paf *paf_read(FILE *fh, bool parse_cigar_string) {
-    char *c = stFile_getLineFromFile(fh);
-    if(c == NULL) {
+Paf *paf_read_with_buffer(FILE *fh, bool parse_cigar_string, char **paf_buffer, int64_t *paf_length_buffer) {
+    int64_t i = stFile_getLineFromFileWithBufferUnlocked(paf_buffer, paf_length_buffer, fh);
+    if (i == -1 && strlen(*paf_buffer) == 0) {
         return NULL;
     }
-    Paf *paf = paf_parse(c, parse_cigar_string);
-    free(c);
+    Paf *paf = paf_parse(*paf_buffer, parse_cigar_string);
+    return paf;
+}
 
+Paf *paf_read(FILE *fh, bool parse_cigar_string) {
+    int64_t buf_size = 4096;  // If too small, will get realloced
+    char *buf = st_malloc(buf_size);
+    Paf *paf = paf_read_with_buffer(fh, parse_cigar_string, &buf, &buf_size);
+    free(buf);
     return paf;
 }
 
@@ -228,82 +236,6 @@ int64_t cigar_number_of_records(Paf *paf) {
         c = c->next;
     }
     return i;
-}
-
-char *paf_print(Paf *paf) {
-    // Generous estimate of size needed for each paf record.
-    int64_t cigar_size = paf->cigar_string != NULL ? strlen(paf->cigar_string) :
-                         12 * cigar_number_of_records(paf);
-    int64_t buf_size = cigar_size + 300 + strlen(paf->query_name) + strlen(paf->target_name);
-    char *buffer = st_malloc(sizeof(char) * buf_size); // Generate buffer
-    int64_t i = sprintf(buffer, "%s\t%" PRIi64 "\t%" PRIi64"\t%" PRIi64"\t%c\t%s\t%" PRIi64"\t%" PRIi64"\t%" PRIi64
-                                "\t%" PRIi64 "\t%" PRIi64 "\t%" PRIi64,
-                        paf->query_name, paf->query_length, paf->query_start, paf->query_end,
-                        paf->same_strand ? '+' : '-',
-                        paf->target_name, paf->target_length, paf->target_start, paf->target_end,
-                        paf->num_matches, paf->num_bases, paf->mapping_quality);
-    if(paf->type != '\0' || paf->tile_level != -1) {
-        // if paf type not specified, use tile_level
-        char t = paf->type;
-        if (t == '\0') {
-            t = paf->tile_level > 1 ? 'S' : 'P';
-        }
-        // sanity check (assumption: secondary alignment iff tile != 1)
-        assert(paf->type != 'S' || paf->tile_level == -1 || paf->tile_level != 1);
-        i += sprintf(buffer+i, "\ttp:A:%c", t);
-    }
-    if(paf->score != INT_MAX) {
-        i += sprintf(buffer+i, "\tAS:i:%" PRIi64, paf->score);
-    }
-    if(paf->tile_level != -1) {
-        i += sprintf(buffer+i, "\ttl:i:%" PRIi64, paf->tile_level);
-    }
-    if(paf->chain_id != -1) {
-        i += sprintf(buffer+i, "\tcn:i:%" PRIi64, paf->chain_id);
-    }
-    if(paf->chain_score != -1) {
-        i += sprintf(buffer+i, "\ts1:i:%" PRIi64, paf->chain_score);
-    }
-    if(i > buf_size) {
-        st_errAbort("Size of paf record exceeded buffer size (1)\n");
-    }
-    if(paf->cigar) {
-        i += sprintf(buffer+i, "\tcg:Z:");
-        Cigar *c = paf->cigar;
-        while(c != NULL) {
-            char op_char = 'N'; // The N will never get used
-            switch(c->op) {
-                case match:
-                    op_char = 'M';
-                    break;
-                case query_insert:
-                    op_char = 'I';
-                    break;
-                case query_delete:
-                    op_char = 'D';
-                    break;
-                case sequence_match:
-                    op_char = '=';
-                    break;
-                case sequence_mismatch:
-                    op_char = 'X';
-                    break;
-            }
-            i += sprintf(buffer+i, "%" PRIi64 "%c", (int64_t)c->length, op_char);
-            c = c->next;
-            if(i > buf_size) {
-                st_errAbort("Size of paf record exceeded buffer size (2)\n");
-            }
-        }
-    }
-    else if(paf->cigar_string) {
-        i += sprintf(buffer+i, "\tcg:Z:%s", paf->cigar_string);
-    }
-    buffer[i++] = '\0'; // Add a string terminating character
-    if(i > buf_size) {
-        st_errAbort("Size of paf record exceeded buffer size (3)\n");
-    }
-    return buffer;
 }
 
 void paf_stats_calc(Paf *paf, int64_t *matches, int64_t *mismatches, int64_t *query_inserts, int64_t *query_deletes,
@@ -389,14 +321,8 @@ void paf_pretty_print(Paf *paf, char *query_seq, char *target_seq, FILE *fh, boo
     }
 }
 
-void paf_write(Paf *paf, FILE *fh) {
-    // Use stack buffer for small records, heap for large cigars
-    int64_t cigar_size = paf->cigar_string != NULL ? strlen(paf->cigar_string) :
-                         12 * cigar_number_of_records(paf);
-    int64_t buf_size = cigar_size + 300 + strlen(paf->query_name) + strlen(paf->target_name);
-    char stack_buf[4096];
-    char *buf = buf_size <= 4096 ? stack_buf : st_malloc(buf_size);
-    char *p = buf;
+static int64_t paf_write_to_buffer(Paf *paf, char *paf_buffer) {
+    char *p = paf_buffer;
 
     // Query name and coords
     int64_t len = strlen(paf->query_name);
@@ -467,9 +393,43 @@ void paf_write(Paf *paf, FILE *fh) {
     }
 
     *p++ = '\n';
-    fwrite(buf, 1, p - buf, fh);
+    return p - paf_buffer;
+}
 
-    if (buf != stack_buf) free(buf);
+static int64_t paf_estimate_buffer_size(Paf *paf) {
+    // estimate size of buffer needed
+    int64_t cigar_size = paf->cigar_string != NULL ? strlen(paf->cigar_string) :
+                         12 * cigar_number_of_records(paf);
+    return cigar_size + 300 + strlen(paf->query_name) + strlen(paf->target_name);
+}
+
+void paf_write_with_buffer(Paf *paf, FILE *fh, char **paf_buffer, int64_t *paf_length_buffer) {
+    int64_t buf_size = paf_estimate_buffer_size(paf);
+    if(buf_size > *paf_length_buffer) {
+        *paf_length_buffer = buf_size * 2 + 1; // Double the buffer size to avoid constant reallocs
+        *paf_buffer = realloc(*paf_buffer, *paf_length_buffer);
+    }
+    int64_t i = paf_write_to_buffer(paf, *paf_buffer);
+    fwrite(*paf_buffer, 1, i, fh);
+}
+
+void paf_write(Paf *paf, FILE *fh) {
+    int64_t buf_size = paf_estimate_buffer_size(paf);
+    char stack_buf[4096];
+    char *buf = buf_size <= 4096 ? stack_buf : st_malloc(buf_size); // Use stack buffer for small records, heap for large cigars
+    int64_t i = paf_write_to_buffer(paf, buf);
+    fwrite(buf, 1, i, fh);
+    if(buf_size > 4096) {
+        free(buf);
+    }
+}
+
+char *paf_print(Paf *paf) {
+    int64_t buf_size = paf_estimate_buffer_size(paf);
+    char *buf = st_malloc(buf_size + 1);
+    int64_t i = paf_write_to_buffer(paf, buf);
+    buf[i-1] = '\0'; // Replace newline with a termination character
+    return buf;
 }
 
 void paf_check(Paf *paf) {
