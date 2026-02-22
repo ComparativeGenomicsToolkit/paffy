@@ -34,11 +34,11 @@ static int paf_cmp_by_descending_score(const void *a, const void *b) {
 }
 
 static int64_t get_median_alignment_level(uint16_t *counts, Paf *paf) {
-    Cigar *c = paf->cigar;
     int64_t i = paf->query_start, max_level=0, matches=0;
     int64_t *level_counts = st_calloc(UINT16_MAX, sizeof(int64_t)); // An array of counts of the number of bases with the given alignment level
     // such that level_counts[i] is the number of bases in the query with level_counts[i] number of alignments to it (at this point in the tiling)
-    while(c != NULL) {
+    for(int64_t ci = 0; ci < cigar_count(paf->cigar); ci++) {
+        CigarRecord *c = cigar_get(paf->cigar, ci);
         if(c->op != query_delete) {
             if(c->op != query_insert) { // is a match or mismatch, but not an insert in the query
                 assert(c->op == match || c->op == sequence_match || c->op == sequence_mismatch);
@@ -54,7 +54,6 @@ static int64_t get_median_alignment_level(uint16_t *counts, Paf *paf) {
             }
             i += c->length;
         }
-        c = c->next;
     }
     assert(i == paf->query_end);
 
