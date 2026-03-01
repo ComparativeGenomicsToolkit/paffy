@@ -57,12 +57,23 @@ typedef enum _cigarOp {
     sequence_mismatch = 4 // representing a mismatch - represented using an X symbol
 } CigarOp;
 
-typedef struct _cigar Cigar;
-struct _cigar {
-    Cigar *next;
+// 8-byte element (same bitfield packing, no pointer)
+typedef struct _cigar_record {
     int64_t length : 56;
     int64_t op : 8;
+} CigarRecord;
+
+// Array container
+typedef struct _cigar Cigar;
+struct _cigar {
+    CigarRecord *recs;   // Contiguous array
+    int64_t length;      // Number of active elements
+    int64_t start;       // Offset for O(1) prefix trimming
+    int64_t capacity;    // Allocated slots in recs
 };
+
+static inline int64_t cigar_count(Cigar *c) { return c ? c->length : 0; }
+static inline CigarRecord *cigar_get(Cigar *c, int64_t i) { return &c->recs[c->start + i]; }
 
 /*
  * Convert a cigar string into a linked list of cigar operations
@@ -118,6 +129,12 @@ Paf *paf_read(FILE *fh, bool parse_cigar_string);
 Paf *paf_read2(FILE *fh);
 
 /*
+ * Read a PAF alignment record from the given file. Returns NULL if no record available. Uses given string buffer to avoid
+ * malloc. Is not thread safe for the given file handle.
+ */
+Paf *paf_read_with_buffer(FILE *fh, bool parse_cigar_string, char **paf_buffer, int64_t *paf_length_buffer);
+
+/*
  * Prints a paf record
  */
 char *paf_print(Paf *paf);
@@ -137,6 +154,12 @@ void paf_pretty_print(Paf *paf, char *query_seq, char *target_seq, FILE *fh, boo
  * Writes a PAF alignment to the given file.
  */
 void paf_write(Paf *paf, FILE *fh);
+
+/*
+ * As paf_write, but using a provided buffer to avoid malloc.
+ */
+void paf_write_with_buffer(Paf *paf, FILE *fh, char **paf_buffer, int64_t *paf_length_buffer);
+
 
 /*
  * Checks a paf alignment coordinates and cigar are valid, error aborts if not.

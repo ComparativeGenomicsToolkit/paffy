@@ -20,6 +20,7 @@ extern int paffy_trim_main(int argc, char *argv[]);
 extern int paffy_upconvert_main(int argc, char *argv[]);
 extern int paffy_view_main(int argc, char *argv[]);
 extern int paffy_filter_main(int argc, char *argv[]);
+extern int paffy_split_file_main(int argc, char *argv[]);
 
 void usage(void) {
     fprintf(stderr, "paffy: toolkit for working with PAF files\n\n");
@@ -37,6 +38,7 @@ void usage(void) {
     fprintf(stderr, "    to_bed                   Build an alignment coverage map of a chosen sequence in BED format\n");
     fprintf(stderr, "    trim                     Slice of lower identity tail alignments\n");
     fprintf(stderr, "    upconvert                Converts the coordinates of paf alignments to refer to extracted subsequences\n");
+    fprintf(stderr, "    split_file               Split PAF file into per-target-contig output files\n");
     fprintf(stderr, "    view                     Pretty print and extract stats about PAF alignments\n");
     fprintf(stderr, "\n");
 }
@@ -69,6 +71,8 @@ int main(int argc, char *argv[]) {
         return paffy_trim_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "upconvert") == 0) {
         return paffy_upconvert_main(argc - 1, argv + 1);
+    } else if (strcmp(argv[1], "split_file") == 0) {
+        return paffy_split_file_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "view") == 0) {
         return paffy_view_main(argc - 1, argv + 1);
     } else {
