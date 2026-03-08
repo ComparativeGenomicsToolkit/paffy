@@ -146,7 +146,9 @@ int paffy_view_main(int argc, char *argv[]) {
     total_query_insert_bases=0, total_query_delete_bases=0;
 
     Paf *paf;
-    while((paf = paf_read(input, 1)) != NULL) {
+    int64_t paf_buffer_length = 100;
+    char *paf_buffer = st_malloc(sizeof(char) * paf_buffer_length);
+    while((paf = paf_read_with_buffer(input, 1, &paf_buffer, &paf_buffer_length)) != NULL) {
         // Get the query sequence
         char *query_seq = stHash_search(sequences, paf->query_name);
         if(query_seq == NULL) {
@@ -179,6 +181,7 @@ int paffy_view_main(int argc, char *argv[]) {
         // Cleanup
         paf_destruct(paf);
     }
+    free(paf_buffer);
 
     if(include_aggregate_stats) {
         fprintf(output, "Total-alignments:%" PRIi64"\tAvg-Identity:%f\tAvg-Identity-with-gaps:%f\tAligned-bases:%"

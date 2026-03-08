@@ -83,14 +83,17 @@ int paffy_shatter_main(int argc, char *argv[]) {
     FILE *output = outputFile == NULL ? stdout : fopen(outputFile, "w");
 
     Paf *paf;
-    while((paf = paf_read(input, 1)) != NULL) {
+    int64_t paf_buffer_length = 100;
+    char *paf_buffer = st_malloc(sizeof(char) * paf_buffer_length);
+    while((paf = paf_read_with_buffer(input, 1, &paf_buffer, &paf_buffer_length)) != NULL) {
         stList *matches = paf_shatter(paf);
         for(int64_t i=0; i<stList_length(matches); i++) {
-            paf_write(stList_get(matches, i), output);
+            paf_write_with_buffer(stList_get(matches, i), output, &paf_buffer, &paf_buffer_length);
         }
         stList_destruct(matches);
         paf_destruct(paf);
     }
+    free(paf_buffer);
 
     //////////////////////////////////////////////
     // Cleanup

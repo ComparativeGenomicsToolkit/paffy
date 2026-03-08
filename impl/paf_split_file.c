@@ -137,7 +137,9 @@ static FILE *get_output_file(stHash *target_to_file, const char *target_name, co
 
      Paf *paf;
      int64_t total_records = 0;
-     while((paf = paf_read(input, 0)) != NULL) {
+     int64_t paf_buffer_length = 100;
+     char *paf_buffer = st_malloc(sizeof(char) * paf_buffer_length);
+     while((paf = paf_read_with_buffer(input, 0, &paf_buffer, &paf_buffer_length)) != NULL) {
          char *contig_name = split_by_query ? paf->query_name : paf->target_name;
          int64_t contig_length = split_by_query ? paf->query_length : paf->target_length;
          FILE *output;
@@ -165,10 +167,11 @@ static FILE *get_output_file(stHash *target_to_file, const char *target_name, co
          } else {
              output = get_output_file(contig_to_file, contig_name, prefix);
          }
-         paf_write(paf, output);
+         paf_write_with_buffer(paf, output, &paf_buffer, &paf_buffer_length);
          total_records++;
          paf_destruct(paf);
      }
+     free(paf_buffer);
 
      //////////////////////////////////////////////
      // Cleanup

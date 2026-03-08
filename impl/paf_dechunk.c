@@ -109,12 +109,15 @@ int paffy_dechunk_main(int argc, char *argv[]) {
      FILE *output = outputFile == NULL ? stdout : fopen(outputFile, "w");
 
      Paf *paf;
-     while((paf = paf_read(input, 1)) != NULL) {
+     int64_t paf_buffer_length = 100;
+     char *paf_buffer = st_malloc(sizeof(char) * paf_buffer_length);
+     while((paf = paf_read_with_buffer(input, 1, &paf_buffer, &paf_buffer_length)) != NULL) {
          paf_dechunk(paf, fix_query, fix_target);
          paf_check(paf);
-         paf_write(paf, output);
+         paf_write_with_buffer(paf, output, &paf_buffer, &paf_buffer_length);
          paf_destruct(paf);
      }
+     free(paf_buffer);
 
      //////////////////////////////////////////////
      // Cleanup

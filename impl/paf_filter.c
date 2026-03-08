@@ -118,7 +118,9 @@ static void usage(void) {
      FILE *output = outputFile == NULL ? stdout : fopen(outputFile, "w");
 
      Paf *paf;
-     while((paf = paf_read(input, 1)) != NULL) {
+     int64_t paf_buffer_length = 100;
+     char *paf_buffer = st_malloc(sizeof(char) * paf_buffer_length);
+     while((paf = paf_read_with_buffer(input, 1, &paf_buffer, &paf_buffer_length)) != NULL) {
          // Calculate identity stats
          int64_t matches=0, mismatches=0, query_inserts=0, query_deletes=0,
                  query_insert_bases=0, query_delete_bases=0;
@@ -133,25 +135,26 @@ static void usage(void) {
                  if(st_getLogLevel() == debug) {
                      st_logDebug("Filtering alignment with matches:%" PRIi64 ", identity: %f (%f with gaps), score: %" PRIi64
                      ", chain-score:%" PRIi64 "\n", matches, identity, identity_with_gaps, paf->score, paf->chain_score);
-                     paf_write(paf, stderr);
+                     paf_write_with_buffer(paf, stderr, &paf_buffer, &paf_buffer_length);
                  }
              }
              else {
-                 paf_write(paf, output);
+                 paf_write_with_buffer(paf, output, &paf_buffer, &paf_buffer_length);
              }
          }
          else {
              if(invert) {
-                 paf_write(paf, output);
+                 paf_write_with_buffer(paf, output, &paf_buffer, &paf_buffer_length);
              }
              else if(st_getLogLevel() == debug) {
                 st_logDebug("Filtering alignment with matches:%" PRIi64 ", identity: %f (%f with gaps), score: %" PRIi64
                  ", chain-score:%" PRIi64 "\n", matches, identity, identity_with_gaps, paf->score, paf->chain_score);
-                paf_write(paf, stderr);
+                paf_write_with_buffer(paf, stderr, &paf_buffer, &paf_buffer_length);
             }
          }
          paf_destruct(paf);
      }
+     free(paf_buffer);
 
      //////////////////////////////////////////////
      // Cleanup

@@ -104,7 +104,9 @@ int paffy_add_mismatches_main(int argc, char *argv[]) {
     FILE *output = outputFile == NULL ? stdout : fopen(outputFile, "w");
 
     Paf *paf;
-    while((paf = paf_read(input, 1)) != NULL) {
+    int64_t paf_buffer_length = 100;
+    char *paf_buffer = st_malloc(sizeof(char) * paf_buffer_length);
+    while((paf = paf_read_with_buffer(input, 1, &paf_buffer, &paf_buffer_length)) != NULL) {
 
         if(remove_mismatches) { // Remove match/mismatch encoding to replace with maximal gapless alignments
             paf_remove_mismatches(paf);
@@ -131,11 +133,12 @@ int paffy_add_mismatches_main(int argc, char *argv[]) {
         paf_check(paf);
 
         // Now print the alignment
-        paf_write(paf, output);
+        paf_write_with_buffer(paf, output, &paf_buffer, &paf_buffer_length);
 
         // Cleanup
         paf_destruct(paf);
     }
+    free(paf_buffer);
 
     //////////////////////////////////////////////
     // Cleanup
