@@ -143,17 +143,20 @@ int paffy_upconvert_main(int argc, char *argv[]) {
     FILE *input = paf_file == NULL ? stdin : fopen(paf_file, "r");
     FILE *output = output_file == NULL ? stdout : fopen(output_file, "w");
     Paf *paf;
-    while((paf = paf_read(input, 0)) != NULL) {
+    int64_t paf_buffer_length = 100;
+    char *paf_buffer = st_malloc(sizeof(char) * paf_buffer_length);
+    while((paf = paf_read_with_buffer(input, 0, &paf_buffer, &paf_buffer_length)) != NULL) {
         // fix query and target coordinates
         fix_interval(intervals, &(paf->query_name), &(paf->query_start), &(paf->query_end), &(paf->query_length));
         fix_interval(intervals, &(paf->target_name), &(paf->target_start), &(paf->target_end), &(paf->target_length));
 
         paf_check(paf); // Check all is okay
 
-        paf_write(paf, output); // Write out the adjust paf
+        paf_write_with_buffer(paf, output, &paf_buffer, &paf_buffer_length); // Write out the adjust paf
 
         paf_destruct(paf); // Cleanup
     }
+    free(paf_buffer);
 
     //////////////////////////////////////////////
     // Cleanup

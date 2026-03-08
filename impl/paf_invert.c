@@ -79,10 +79,12 @@ static void usage(void) {
      FILE *output = outputFile == NULL ? stdout : fopen(outputFile, "w");
 
      Paf *paf;
-     while((paf = paf_read(input, 1)) != NULL) {
+     int64_t paf_buffer_length = 100;
+     char *paf_buffer = st_malloc(sizeof(char) * paf_buffer_length);
+     while((paf = paf_read_with_buffer(input, 1, &paf_buffer, &paf_buffer_length)) != NULL) {
          paf_invert(paf); // the invert routine
          paf_check(paf);
-         paf_write(paf, output);
+         paf_write_with_buffer(paf, output, &paf_buffer, &paf_buffer_length);
          paf_destruct(paf);
      }
 
@@ -90,6 +92,7 @@ static void usage(void) {
      // Cleanup
      //////////////////////////////////////////////
 
+     free(paf_buffer);
      if(inputFile != NULL) {
          fclose(input);
      }

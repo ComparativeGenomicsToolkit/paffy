@@ -112,7 +112,9 @@ int paffy_dedupe_main(int argc, char *argv[]) {
     FILE *output = outputFile == NULL ? stdout : fopen(outputFile, "w");
     stHash *pafs = stHash_construct3(paf_hash_key, paf_equal_key, NULL, (void (*)(void *))paf_destruct);
     Paf *paf;
-    while((paf = paf_read(input, 0)) != NULL) {
+    int64_t paf_buffer_length = 100;
+    char *paf_buffer = st_malloc(sizeof(char) * paf_buffer_length);
+    while((paf = paf_read_with_buffer(input, 0, &paf_buffer, &paf_buffer_length)) != NULL) {
         // Get the query sequence
         Paf *pPaf = stHash_search(pafs, paf);
         if(check_inverse && pPaf == NULL) { // In case we want to check if we already output the inverse
@@ -123,7 +125,7 @@ int paffy_dedupe_main(int argc, char *argv[]) {
         }
         if(pPaf == NULL) {  // If duplicate is not already in there
             stHash_insert(pafs, paf, paf);  // Add the paf
-            paf_write(paf, output); // Write the paf to the output
+            paf_write_with_buffer(paf, output, &paf_buffer, &paf_buffer_length); // Write the paf to the output
         }
         else {
             // If debug output report info on dupe
@@ -143,6 +145,8 @@ int paffy_dedupe_main(int argc, char *argv[]) {
     //////////////////////////////////////////////
     // Cleanup
     //////////////////////////////////////////////
+
+    free(paf_buffer);
 
     if(inputFile != NULL) {
         fclose(input);

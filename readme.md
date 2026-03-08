@@ -12,7 +12,7 @@ files.
 Do build this repo clone the repo as follows and then make:
 
     git clone https://github.com/ComparativeGenomicsToolkit/paffy.git --recursive
-    cd paf && make
+    cd paffy && make
 
 To test the installation, after adding the paffy/bin directory to your path, do:
 
@@ -37,6 +37,8 @@ All Paffy utilities are run using `paffy <command>`, where the available command
     dedupe         Remove duplicate alignments from a file based on exact query/target coordinates
     dechunk        Manipulate coordinates to allow aggregation of PAFs computed over subsequences
     upconvert      Converts the coordinates of paf alignments to refer to extracted subsequences
+    split_file     Split a PAF file into separate output files by target contig name. Optionally
+                   group small contigs (below a given target length threshold) into size-bounded files
 ```
 
 In addition the FASTA utilities are run using the `faffy <command>`, where the available commands are:

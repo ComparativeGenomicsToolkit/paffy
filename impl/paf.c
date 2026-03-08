@@ -48,10 +48,9 @@ static inline int64_t str_to_int64(const char *s) {
 }
 
 void cigar_destruct(Cigar *c) {
-    while (c != NULL) { // Cleanup the individual cigar records
-        Cigar *c2 = c->next;
+    if (c != NULL) {
+        free(c->recs);
         free(c);
-        c = c2;
     }
 }
 
@@ -68,151 +67,161 @@ void paf_destruct(Paf *paf) {
     free(paf);
 }
 
-static Cigar *parse_cigar_record(char **c) {
-    Cigar *cigar = st_calloc(1, sizeof(Cigar)); // Allocate a cigar record
-    // Calculate the number of characters representing the length of the record
-    int64_t i=0;
-    while(isdigit((*c)[i])) {
-        i++;
-    }
-    char t = (*c)[i]; // The type of the cigar operation
-    switch(t) {
-    case 'M': // match
-        cigar->op = match;
-        break;
-    case '=': // exact match
-        cigar->op = sequence_match;
-        break;
-    case 'X': // snp match
-        cigar->op = sequence_mismatch;
-        break;
-    case 'I':
-        cigar->op = query_insert;
-        break;
-    case 'D':
-        cigar->op = query_delete;
-        break;
-    default:
-        st_errAbort("Got an unexpected character paf cigar string: %c\n", t);
-        break;
-    }
-    (*c)[i] = ' '; // This is just defensive, to put some white space around the integer being parsed
-    cigar->length = str_to_int64(*c);
-    (*c)[i] = t; // Now fix the original string
-    *c = &((*c)[i+1]);
-    return cigar;
-}
-
 Cigar *cigar_parse(char *cigar_string) {
     if(cigar_string[0] == '\0') { // If is the empty string
         return NULL;
     }
-    Cigar *cigar = parse_cigar_record(&cigar_string);
-    Cigar *pCigar = cigar;
-    while(cigar_string[0] != '\0') {
-        Cigar *nCigar = parse_cigar_record(&cigar_string);
-        pCigar->next = nCigar;
-        pCigar = nCigar;
+    // First pass: count operations
+    int64_t count = 0;
+    for (char *s = cigar_string; *s != '\0'; s++) {
+        if (*s == 'M' || *s == 'I' || *s == 'D' || *s == '=' || *s == 'X') {
+            count++;
+        }
     }
+    // Allocate container and array
+    Cigar *cigar = st_malloc(sizeof(Cigar));
+    cigar->recs = st_malloc(count * sizeof(CigarRecord));
+    cigar->length = count;
+    cigar->start = 0;
+    cigar->capacity = count;
+    // Second pass: fill records
+    int64_t idx = 0;
+    char *s = cigar_string;
+    while (*s != '\0') {
+        int64_t len = 0;
+        while (*s >= '0' && *s <= '9') {
+            len = len * 10 + (*s++ - '0');
+        }
+        CigarOp op;
+        switch (*s) {
+            case 'M': op = match; break;
+            case '=': op = sequence_match; break;
+            case 'X': op = sequence_mismatch; break;
+            case 'I': op = query_insert; break;
+            case 'D': op = query_delete; break;
+            default: st_errAbort("Got an unexpected character paf cigar string: %c\n", *s); op = match; break;
+        }
+        cigar->recs[idx].length = len;
+        cigar->recs[idx].op = op;
+        idx++;
+        s++;
+    }
+    assert(idx == count);
     return cigar;
 }
 
-static Cigar *cigar_reverse(Cigar *c) {
-    if(c == NULL) {
-        return NULL;
-    }
-    Cigar *p = NULL;
-    // p -> c -> n -> q
-    while(c->next != NULL) {
-        Cigar *n = c->next;
-        c->next = p; // p <- c , n -> q
-        p = c;
-        c = n;
-    }
-    c->next = p; // p <- c <- n
+static Cigar *cigar_construct_single(int64_t length, CigarOp op) {
+    Cigar *c = st_malloc(sizeof(Cigar));
+    c->recs = st_malloc(sizeof(CigarRecord));
+    c->length = 1;
+    c->start = 0;
+    c->capacity = 1;
+    c->recs[0].length = length;
+    c->recs[0].op = op;
     return c;
+}
+
+static void cigar_reverse(Cigar *c) {
+    if (c == NULL || c->length <= 1) return;
+    int64_t lo = c->start;
+    int64_t hi = c->start + c->length - 1;
+    while (lo < hi) {
+        CigarRecord tmp = c->recs[lo];
+        c->recs[lo] = c->recs[hi];
+        c->recs[hi] = tmp;
+        lo++;
+        hi--;
+    }
 }
 
 Paf *paf_parse(char *paf_string, bool parse_cigar_string) {
     Paf *paf = st_calloc(1, sizeof(Paf));
 
-    stList *tokens = stString_split(paf_string); // Tokenize the record
+    char *saveptr;
+    char *token;
 
-    // Get query coordinates
-    paf->query_name = stList_get(tokens, 0);
-    stList_set(tokens, 0, NULL); // Transfer ownership
-    paf->query_length = str_to_int64(stList_get(tokens, 1));
-    paf->query_start = str_to_int64(stList_get(tokens, 2));
-    paf->query_end = str_to_int64(stList_get(tokens, 3));
+    // Field 0: query_name (must copy — stored in Paf)
+    token = strtok_r(paf_string, "\t", &saveptr);
+    paf->query_name = stString_copy(token);
 
-    // Is the alignment forward or reverse
-    char strand = ((char *)stList_get(tokens, 4))[0];
+    // Fields 1-3: query_length, query_start, query_end
+    paf->query_length = str_to_int64(strtok_r(NULL, "\t", &saveptr));
+    paf->query_start = str_to_int64(strtok_r(NULL, "\t", &saveptr));
+    paf->query_end = str_to_int64(strtok_r(NULL, "\t", &saveptr));
+
+    // Field 4: strand
+    token = strtok_r(NULL, "\t", &saveptr);
+    char strand = token[0];
     if(strand != '+' && strand != '-') {
-        st_errAbort("Got an unexpected strand character (%c) in a paf string: %s\n", strand, paf_string);
+        st_errAbort("Got an unexpected strand character (%c) in a paf string\n", strand);
     }
     paf->same_strand = strand == '+';
 
-    // Get target coordinates
-    paf->target_name = stList_get(tokens, 5);
-    stList_set(tokens, 5, NULL); // Transfer ownership
-    paf->target_length = str_to_int64(stList_get(tokens, 6));
-    paf->target_start = str_to_int64(stList_get(tokens, 7));
-    paf->target_end = str_to_int64(stList_get(tokens, 8));
+    // Field 5: target_name (must copy — stored in Paf)
+    token = strtok_r(NULL, "\t", &saveptr);
+    paf->target_name = stString_copy(token);
 
-    // Get the core alignment metric attributes of the record
-    paf->num_matches = str_to_int64(stList_get(tokens, 9));
-    paf->num_bases = str_to_int64(stList_get(tokens, 10));
-    paf->mapping_quality = str_to_int64(stList_get(tokens, 11));
+    // Fields 6-8: target_length, target_start, target_end
+    paf->target_length = str_to_int64(strtok_r(NULL, "\t", &saveptr));
+    paf->target_start = str_to_int64(strtok_r(NULL, "\t", &saveptr));
+    paf->target_end = str_to_int64(strtok_r(NULL, "\t", &saveptr));
+
+    // Fields 9-11: num_matches, num_bases, mapping_quality
+    paf->num_matches = str_to_int64(strtok_r(NULL, "\t", &saveptr));
+    paf->num_bases = str_to_int64(strtok_r(NULL, "\t", &saveptr));
+    paf->mapping_quality = str_to_int64(strtok_r(NULL, "\t", &saveptr));
 
     // Set the following to default values to distinguish them from when they are initialized and 0
     paf->tile_level = -1;
     paf->chain_id = -1;
     paf->chain_score = -1;
 
-    // Parse the remaining optional tags
-    for(int64_t i=12; i<stList_length(tokens); i++) {
-        stList *tag = stString_splitByString(stList_get(tokens, i), ":");
-        char *type = stList_get(tag, 0);
-        if(strcmp(type, "tp") == 0) {
-            paf->type = ((char *)stList_get(tag, 2))[0];
-            assert(paf->type == 'P' || paf->type == 'S' || paf->type == 'I');
-        } else if (strcmp(type, "AS") == 0) {
-            paf->score = str_to_int64(stList_get(tag, 2));
-        } else if(strcmp(type, "cg") == 0) {
-            if(parse_cigar_string) {
-                paf->cigar = cigar_parse(stList_get(tag, 2));
-            }
-            else {
-                paf->cigar_string = stList_get(tag, 2); // Transfer ownership
-                stList_set(tag, 2, NULL);
-            }
+    // Parse optional tags — format is always XX:T:value
+    // Direct character indexing avoids stString_splitByString overhead
+    while((token = strtok_r(NULL, "\t", &saveptr)) != NULL) {
+        if(token[2] != ':' || token[4] != ':') {
+            continue; // Skip malformed tags
         }
-        else if(strcmp(type, "tl") == 0) {
-            paf->tile_level = str_to_int64(stList_get(tag, 2));
-        }
-        else if(strcmp(type, "cn") == 0) {
-            paf->chain_id = str_to_int64(stList_get(tag, 2));
-        }
-        else if(strcmp(type, "s1") == 0) {
-            paf->chain_score = str_to_int64(stList_get(tag, 2));
-        }
-        stList_destruct(tag);
-    }
+        char tag0 = token[0], tag1 = token[1];
+        char *value = token + 5;
 
-    // Cleanup
-    stList_destruct(tokens);
+        if(tag0 == 't' && tag1 == 'p') {
+            paf->type = value[0];
+            assert(paf->type == 'P' || paf->type == 'S' || paf->type == 'I');
+        } else if(tag0 == 'A' && tag1 == 'S') {
+            paf->score = str_to_int64(value);
+        } else if(tag0 == 'c' && tag1 == 'g') {
+            if(parse_cigar_string) {
+                paf->cigar = cigar_parse(value);
+            } else {
+                paf->cigar_string = stString_copy(value);
+            }
+        } else if(tag0 == 't' && tag1 == 'l') {
+            paf->tile_level = str_to_int64(value);
+        } else if(tag0 == 'c' && tag1 == 'n') {
+            paf->chain_id = str_to_int64(value);
+        } else if(tag0 == 's' && tag1 == '1') {
+            paf->chain_score = str_to_int64(value);
+        }
+    }
 
     return paf;
 }
 
-Paf *paf_read(FILE *fh, bool parse_cigar_string) {
-    char *c = stFile_getLineFromFile(fh);
-    if(c == NULL) {
+Paf *paf_read_with_buffer(FILE *fh, bool parse_cigar_string, char **paf_buffer, int64_t *paf_length_buffer) {
+    int64_t i = stFile_getLineFromFileWithBufferUnlocked(paf_buffer, paf_length_buffer, fh);
+    if (i == -1 && strlen(*paf_buffer) == 0) {
         return NULL;
     }
-    Paf *paf = paf_parse(c, parse_cigar_string);
-    free(c);
+    Paf *paf = paf_parse(*paf_buffer, parse_cigar_string);
+    return paf;
+}
 
+Paf *paf_read(FILE *fh, bool parse_cigar_string) {
+    int64_t buf_size = 4096;  // If too small, will get realloced
+    char *buf = st_malloc(buf_size);
+    Paf *paf = paf_read_with_buffer(fh, parse_cigar_string, &buf, &buf_size);
+    free(buf);
     return paf;
 }
 
@@ -221,89 +230,7 @@ Paf *paf_read2(FILE *fh) {
 }
 
 int64_t cigar_number_of_records(Paf *paf) {
-    int64_t i=0;
-    Cigar *c = paf->cigar;
-    while(c != NULL) {
-        i++;
-        c = c->next;
-    }
-    return i;
-}
-
-char *paf_print(Paf *paf) {
-    // Generous estimate of size needed for each paf record.
-    int64_t cigar_size = paf->cigar_string != NULL ? strlen(paf->cigar_string) :
-                         12 * cigar_number_of_records(paf);
-    int64_t buf_size = cigar_size + 300 + strlen(paf->query_name) + strlen(paf->target_name);
-    char *buffer = st_malloc(sizeof(char) * buf_size); // Generate buffer
-    int64_t i = sprintf(buffer, "%s\t%" PRIi64 "\t%" PRIi64"\t%" PRIi64"\t%c\t%s\t%" PRIi64"\t%" PRIi64"\t%" PRIi64
-                                "\t%" PRIi64 "\t%" PRIi64 "\t%" PRIi64,
-                        paf->query_name, paf->query_length, paf->query_start, paf->query_end,
-                        paf->same_strand ? '+' : '-',
-                        paf->target_name, paf->target_length, paf->target_start, paf->target_end,
-                        paf->num_matches, paf->num_bases, paf->mapping_quality);
-    if(paf->type != '\0' || paf->tile_level != -1) {
-        // if paf type not specified, use tile_level
-        char t = paf->type;
-        if (t == '\0') {
-            t = paf->tile_level > 1 ? 'S' : 'P';
-        }
-        // sanity check (assumption: secondary alignment iff tile != 1)
-        assert(paf->type != 'S' || paf->tile_level == -1 || paf->tile_level != 1);
-        i += sprintf(buffer+i, "\ttp:A:%c", t);
-    }
-    if(paf->score != INT_MAX) {
-        i += sprintf(buffer+i, "\tAS:i:%" PRIi64, paf->score);
-    }
-    if(paf->tile_level != -1) {
-        i += sprintf(buffer+i, "\ttl:i:%" PRIi64, paf->tile_level);
-    }
-    if(paf->chain_id != -1) {
-        i += sprintf(buffer+i, "\tcn:i:%" PRIi64, paf->chain_id);
-    }
-    if(paf->chain_score != -1) {
-        i += sprintf(buffer+i, "\ts1:i:%" PRIi64, paf->chain_score);
-    }
-    if(i > buf_size) {
-        st_errAbort("Size of paf record exceeded buffer size (1)\n");
-    }
-    if(paf->cigar) {
-        i += sprintf(buffer+i, "\tcg:Z:");
-        Cigar *c = paf->cigar;
-        while(c != NULL) {
-            char op_char = 'N'; // The N will never get used
-            switch(c->op) {
-                case match:
-                    op_char = 'M';
-                    break;
-                case query_insert:
-                    op_char = 'I';
-                    break;
-                case query_delete:
-                    op_char = 'D';
-                    break;
-                case sequence_match:
-                    op_char = '=';
-                    break;
-                case sequence_mismatch:
-                    op_char = 'X';
-                    break;
-            }
-            i += sprintf(buffer+i, "%" PRIi64 "%c", (int64_t)c->length, op_char);
-            c = c->next;
-            if(i > buf_size) {
-                st_errAbort("Size of paf record exceeded buffer size (2)\n");
-            }
-        }
-    }
-    else if(paf->cigar_string) {
-        i += sprintf(buffer+i, "\tcg:Z:%s", paf->cigar_string);
-    }
-    buffer[i++] = '\0'; // Add a string terminating character
-    if(i > buf_size) {
-        st_errAbort("Size of paf record exceeded buffer size (3)\n");
-    }
-    return buffer;
+    return cigar_count(paf->cigar);
 }
 
 void paf_stats_calc(Paf *paf, int64_t *matches, int64_t *mismatches, int64_t *query_inserts, int64_t *query_deletes,
@@ -312,8 +239,8 @@ void paf_stats_calc(Paf *paf, int64_t *matches, int64_t *mismatches, int64_t *qu
         (*matches) = 0; (*mismatches) = 0; (*query_inserts) = 0; (*query_deletes) = 0;
         (*query_insert_bases) = 0; (*query_delete_bases) = 0;
     }
-    Cigar *c = paf->cigar;
-    while(c != NULL) {
+    for (int64_t idx = 0; idx < cigar_count(paf->cigar); idx++) {
+        CigarRecord *c = cigar_get(paf->cigar, idx);
         if(c->op == sequence_match || c->op == match) {
             *matches += c->length;
         }
@@ -329,7 +256,6 @@ void paf_stats_calc(Paf *paf, int64_t *matches, int64_t *mismatches, int64_t *qu
             (*query_deletes)++;
             (*query_delete_bases)+=c->length;
         }
-        c = c->next;
     }
 }
 
@@ -354,13 +280,13 @@ void paf_pretty_print(Paf *paf, char *query_seq, char *target_seq, FILE *fh, boo
 
     // Now print a base level alignment
     if(include_alignment) {
-        Cigar *c = paf->cigar;
         int64_t max_align_length = paf->query_end - paf->query_start + paf->target_end - paf->target_start;
         char *query_align = st_malloc(sizeof(char) * (max_align_length + 1));
         char *target_align = st_malloc(sizeof(char) * (max_align_length + 1));
         char *star_align = st_malloc(sizeof(char) * (max_align_length + 1));
         int64_t i = 0, j = paf->target_start, k = 0;
-        while (c != NULL) {
+        for (int64_t ci = 0; ci < cigar_count(paf->cigar); ci++) {
+            CigarRecord *c = cigar_get(paf->cigar, ci);
             for (int64_t l = 0; l < c->length; l++) {
                 char m = '-', n = '-';
                 if (c->op != query_insert) {
@@ -374,7 +300,6 @@ void paf_pretty_print(Paf *paf, char *query_seq, char *target_seq, FILE *fh, boo
                 query_align[k] = n;
                 star_align[k++] = toupper(m) == toupper(n) ? '*' : ' ';
             }
-            c = c->next;
         }
         assert(k <= max_align_length);
         int64_t window = 150;
@@ -389,14 +314,8 @@ void paf_pretty_print(Paf *paf, char *query_seq, char *target_seq, FILE *fh, boo
     }
 }
 
-void paf_write(Paf *paf, FILE *fh) {
-    // Use stack buffer for small records, heap for large cigars
-    int64_t cigar_size = paf->cigar_string != NULL ? strlen(paf->cigar_string) :
-                         12 * cigar_number_of_records(paf);
-    int64_t buf_size = cigar_size + 300 + strlen(paf->query_name) + strlen(paf->target_name);
-    char stack_buf[4096];
-    char *buf = buf_size <= 4096 ? stack_buf : st_malloc(buf_size);
-    char *p = buf;
+static int64_t paf_write_to_buffer(Paf *paf, char *paf_buffer) {
+    char *p = paf_buffer;
 
     // Query name and coords
     int64_t len = strlen(paf->query_name);
@@ -447,8 +366,8 @@ void paf_write(Paf *paf, FILE *fh) {
     // CIGAR
     if(paf->cigar) {
         memcpy(p, "\tcg:Z:", 6); p += 6;
-        Cigar *c = paf->cigar;
-        while(c != NULL) {
+        for (int64_t ci = 0; ci < cigar_count(paf->cigar); ci++) {
+            CigarRecord *c = cigar_get(paf->cigar, ci);
             p = int64_to_str(p, c->length);
             switch(c->op) {
                 case match: *p++ = 'M'; break;
@@ -458,7 +377,6 @@ void paf_write(Paf *paf, FILE *fh) {
                 case sequence_mismatch: *p++ = 'X'; break;
                 default: *p++ = 'N'; break;
             }
-            c = c->next;
         }
     } else if(paf->cigar_string) {
         memcpy(p, "\tcg:Z:", 6); p += 6;
@@ -467,9 +385,43 @@ void paf_write(Paf *paf, FILE *fh) {
     }
 
     *p++ = '\n';
-    fwrite(buf, 1, p - buf, fh);
+    return p - paf_buffer;
+}
 
-    if (buf != stack_buf) free(buf);
+static int64_t paf_estimate_buffer_size(Paf *paf) {
+    // estimate size of buffer needed
+    int64_t cigar_size = paf->cigar_string != NULL ? strlen(paf->cigar_string) :
+                         12 * cigar_number_of_records(paf);
+    return cigar_size + 300 + strlen(paf->query_name) + strlen(paf->target_name);
+}
+
+void paf_write_with_buffer(Paf *paf, FILE *fh, char **paf_buffer, int64_t *paf_length_buffer) {
+    int64_t buf_size = paf_estimate_buffer_size(paf);
+    if(buf_size > *paf_length_buffer) {
+        *paf_length_buffer = buf_size * 2 + 1; // Double the buffer size to avoid constant reallocs
+        *paf_buffer = realloc(*paf_buffer, *paf_length_buffer);
+    }
+    int64_t i = paf_write_to_buffer(paf, *paf_buffer);
+    fwrite(*paf_buffer, 1, i, fh);
+}
+
+void paf_write(Paf *paf, FILE *fh) {
+    int64_t buf_size = paf_estimate_buffer_size(paf);
+    char stack_buf[4096];
+    char *buf = buf_size <= 4096 ? stack_buf : st_malloc(buf_size); // Use stack buffer for small records, heap for large cigars
+    int64_t i = paf_write_to_buffer(paf, buf);
+    fwrite(buf, 1, i, fh);
+    if(buf_size > 4096) {
+        free(buf);
+    }
+}
+
+char *paf_print(Paf *paf) {
+    int64_t buf_size = paf_estimate_buffer_size(paf);
+    char *buf = st_malloc(buf_size + 1);
+    int64_t i = paf_write_to_buffer(paf, buf);
+    buf[i-1] = '\0'; // Replace newline with a termination character
+    return buf;
 }
 
 void paf_check(Paf *paf) {
@@ -488,15 +440,14 @@ void paf_check(Paf *paf) {
     if(paf->cigar != NULL) {
         // Check that cigar alignment, if present, matches the alignment:
         int64_t i=0, j=0;
-        Cigar *cigar = paf->cigar;
-        while(cigar != NULL) {
-            if(cigar->op != query_delete) {
-                i += cigar->length;
+        for (int64_t ci = 0; ci < cigar_count(paf->cigar); ci++) {
+            CigarRecord *r = cigar_get(paf->cigar, ci);
+            if(r->op != query_delete) {
+                i += r->length;
             }
-            if(cigar->op != query_insert) {
-                j += cigar->length;
+            if(r->op != query_insert) {
+                j += r->length;
             }
-            cigar = cigar->next;
         }
         if(i != paf->query_end - paf->query_start) {
             st_errAbort("Paf cigar alignment does not match query length: %" PRIi64 " vs. %" PRIi64 " %s", i,
@@ -523,19 +474,18 @@ void paf_invert(Paf *paf) {
     swap((void **)&paf->query_name, (void **)&paf->target_name);
 
     // Switch the query and target in the cigar
-    Cigar *c = paf->cigar;
-    while(c != NULL) {
+    for (int64_t ci = 0; ci < cigar_count(paf->cigar); ci++) {
+        CigarRecord *c = cigar_get(paf->cigar, ci);
         if(c->op == query_insert) {
             c->op = query_delete;
         }
         else if(c->op == query_delete) {
             c->op = query_insert;
         }
-        c = c->next;
     }
     // Now reverse the order if the ordering is swapped
     if(!paf->same_strand) {
-        paf->cigar = cigar_reverse(paf->cigar);
+        cigar_reverse(paf->cigar);
     }
 }
 
@@ -556,58 +506,60 @@ void write_pafs(FILE *fh, stList *pafs) {
 
 int64_t paf_get_number_of_aligned_bases(Paf *paf) {
     int64_t aligned_bases = 0;
-    Cigar *c = paf->cigar;
-    while(c != NULL) {
-        if(c->op == match || c->op == sequence_match || c->op == sequence_mismatch) {
-            aligned_bases += c->length;
+    for (int64_t ci = 0; ci < cigar_count(paf->cigar); ci++) {
+        CigarRecord *r = cigar_get(paf->cigar, ci);
+        if(r->op == match || r->op == sequence_match || r->op == sequence_mismatch) {
+            aligned_bases += r->length;
         }
-        c = c->next;
     }
     return aligned_bases;
 }
 
-static Cigar *cigar_trim(int64_t *query_c, int64_t *target_c, Cigar *c, int64_t end_bases_to_trim, int q_sign, int t_sign) {
+static void cigar_trim(int64_t *query_c, int64_t *target_c, Cigar *c, int64_t end_bases_to_trim, int q_sign, int t_sign) {
     int64_t bases_trimmed = 0;
-    while(c != NULL && ((c->op != match && c->op != sequence_match && c->op != sequence_mismatch) || bases_trimmed < end_bases_to_trim)) {
-        if(c->op == match || c->op == sequence_match || c->op == sequence_mismatch) { // can trim this alignment
-            if(bases_trimmed + c->length > end_bases_to_trim) {
+    while(c->length > 0 && ((cigar_get(c, 0)->op != match && cigar_get(c, 0)->op != sequence_match && cigar_get(c, 0)->op != sequence_mismatch) || bases_trimmed < end_bases_to_trim)) {
+        CigarRecord *r = cigar_get(c, 0);
+        if(r->op == match || r->op == sequence_match || r->op == sequence_mismatch) { // can trim this alignment
+            if(bases_trimmed + r->length > end_bases_to_trim) {
                 int64_t i = end_bases_to_trim - bases_trimmed;
-                c->length -= i;
+                r->length -= i;
                 (*query_c) += q_sign*i;
                 (*target_c) += t_sign*i;
-                assert(c->length > 0);
+                assert(r->length > 0);
                 break;
             }
-            bases_trimmed += c->length;
-            (*query_c) += q_sign*c->length;
-            (*target_c) += t_sign*c->length;
+            bases_trimmed += r->length;
+            (*query_c) += q_sign*r->length;
+            (*target_c) += t_sign*r->length;
         }
-        else if(c->op == query_insert) {
-            (*query_c) += q_sign*c->length;
+        else if(r->op == query_insert) {
+            (*query_c) += q_sign*r->length;
         }
         else {
-            assert(c->op == query_delete);
-            (*target_c) += t_sign*c->length;
+            assert(r->op == query_delete);
+            (*target_c) += t_sign*r->length;
         }
-        Cigar *c2 = c;
-        c = c->next;
-        free(c2);
+        c->start++;
+        c->length--;
     }
-    return c;
 }
 
 void paf_trim_ends(Paf *paf, int64_t end_bases_to_trim) {
     if(paf->same_strand) {
         // Trim front end
-        paf->cigar = cigar_trim(&(paf->query_start), &(paf->target_start), paf->cigar, end_bases_to_trim, 1, 1);
+        cigar_trim(&(paf->query_start), &(paf->target_start), paf->cigar, end_bases_to_trim, 1, 1);
         // Trim back end
-        paf->cigar = cigar_reverse(cigar_trim(&(paf->query_end), &(paf->target_end), cigar_reverse(paf->cigar), end_bases_to_trim, -1, -1));
+        cigar_reverse(paf->cigar);
+        cigar_trim(&(paf->query_end), &(paf->target_end), paf->cigar, end_bases_to_trim, -1, -1);
+        cigar_reverse(paf->cigar);
     }
     else {
         // Trim front end
-        paf->cigar = cigar_trim(&(paf->query_end), &(paf->target_start), paf->cigar, end_bases_to_trim, -1, 1);
+        cigar_trim(&(paf->query_end), &(paf->target_start), paf->cigar, end_bases_to_trim, -1, 1);
         // Trim back end
-        paf->cigar = cigar_reverse(cigar_trim(&(paf->query_start), &(paf->target_end), cigar_reverse(paf->cigar), end_bases_to_trim, 1, -1));
+        cigar_reverse(paf->cigar);
+        cigar_trim(&(paf->query_start), &(paf->target_end), paf->cigar, end_bases_to_trim, 1, -1);
+        cigar_reverse(paf->cigar);
     }
 }
 
@@ -636,9 +588,7 @@ Paf *paf_shatter2(Paf *paf, int64_t query_start, int64_t target_start, int64_t l
     s_paf->target_end = target_start + length;
 
     s_paf->same_strand = paf->same_strand;
-    s_paf->cigar = st_calloc(1, sizeof(Cigar)); // Allocate a cigar record
-    s_paf->cigar->length = length;
-    s_paf->cigar->op = match;
+    s_paf->cigar = cigar_construct_single(length, match);
 
     s_paf->score = paf->score;
     s_paf->mapping_quality = paf->mapping_quality;
@@ -654,11 +604,11 @@ Paf *paf_shatter2(Paf *paf, int64_t query_start, int64_t target_start, int64_t l
 }
 
 stList *paf_shatter(Paf *paf) {
-    Cigar *p = paf->cigar;
     int64_t query_coordinate = paf->same_strand ? paf->query_start : paf->query_end;
     int64_t target_coordinate = paf->target_start;
     stList *matches = stList_construct3(0, (void (*)(void *))paf_destruct);
-    while (p != NULL) {
+    for (int64_t ci = 0; ci < cigar_count(paf->cigar); ci++) {
+        CigarRecord *p = cigar_get(paf->cigar, ci);
         assert(p->length >= 1);
         if (p->op == match) {
             if (paf->same_strand) {
@@ -677,7 +627,6 @@ stList *paf_shatter(Paf *paf) {
             assert(p->op == query_delete);
             target_coordinate += p->length;
         }
-        p = p->next;
     }
     assert(target_coordinate == paf->target_end);
     if (paf->same_strand) {
@@ -716,9 +665,9 @@ SequenceCountArray *get_alignment_count_array(stHash *seq_names_to_alignment_cou
 }
 
 void increase_alignment_level_counts(SequenceCountArray *seq_count_array, Paf *paf) {
-    Cigar *c = paf->cigar;
     int64_t i = paf->query_start;
-    while(c != NULL) {
+    for (int64_t ci = 0; ci < cigar_count(paf->cigar); ci++) {
+        CigarRecord *c = cigar_get(paf->cigar, ci);
         if(c->op != query_delete) {
             if(c->op != query_insert) { // Is some kind of match
                 assert(c->op == match || c->op == sequence_match || c->op == sequence_mismatch);
@@ -732,7 +681,6 @@ void increase_alignment_level_counts(SequenceCountArray *seq_count_array, Paf *p
             }
             i += c->length;
         }
-        c = c->next;
     }
     assert(i == paf->query_end);
 }
@@ -765,117 +713,146 @@ int cmp_intervals(const void *i, const void *j) {
     return k == 0 ? (x->start < y->start ? -1 : (x->start > y->start ? 1 : 0)) : k;
 }
 
-static Cigar *paf_make_match_encoding_mismatches(int64_t target_offset, char *target_seq,
-                                                 int64_t query_offset, char *query_seq,
-                                                 int64_t length, bool same_strand,
-                                                 Cigar **pCigar) {
-    Cigar *cigar = NULL;
-    // Calculate the length of the match
-    int64_t match_run_length=0, mismatch_run_length=0;
+static int64_t count_mismatch_records(int64_t target_offset, char *target_seq,
+                                       int64_t query_offset, char *query_seq,
+                                       int64_t length, bool same_strand) {
+    int64_t count = 0;
+    bool prev_match = false, first = true;
     for(int64_t i=0; i<length; i++) {
-        if(toupper(target_seq[target_offset + i]) == toupper(same_strand ?
-                                                        query_seq[query_offset + i] :
-                                                        stString_reverseComplementChar(query_seq[query_offset - i]))) {
-            if(mismatch_run_length) {
-                assert(match_run_length == 0);
-                cigar = st_calloc(1, sizeof(Cigar)); // Allocate a cigar record
-                cigar->op = sequence_mismatch;
-                cigar->length = mismatch_run_length;
-                *pCigar = cigar;
-                pCigar = &(cigar->next);
-                mismatch_run_length = 0;
-            }
-            match_run_length++;
+        bool is_match = toupper(target_seq[target_offset + i]) == toupper(same_strand ?
+                            query_seq[query_offset + i] :
+                            stString_reverseComplementChar(query_seq[query_offset - i]));
+        if(first || is_match != prev_match) {
+            count++;
+            first = false;
         }
-        else {
-            if(match_run_length) {
-                assert(mismatch_run_length == 0);
-                cigar = st_calloc(1, sizeof(Cigar)); // Allocate a cigar record
-                cigar->op = sequence_match;
-                cigar->length = match_run_length;
-                *pCigar = cigar;
-                pCigar = &(cigar->next);
-                match_run_length = 0;
-            }
-            mismatch_run_length++;
+        prev_match = is_match;
+    }
+    return count;
+}
+
+static int64_t fill_mismatch_records(int64_t target_offset, char *target_seq,
+                                      int64_t query_offset, char *query_seq,
+                                      int64_t length, bool same_strand,
+                                      CigarRecord *dest) {
+    int64_t idx = -1;
+    bool prev_match = false, first = true;
+    for(int64_t i=0; i<length; i++) {
+        bool is_match = toupper(target_seq[target_offset + i]) == toupper(same_strand ?
+                            query_seq[query_offset + i] :
+                            stString_reverseComplementChar(query_seq[query_offset - i]));
+        if(first || is_match != prev_match) {
+            idx++;
+            dest[idx].op = is_match ? sequence_match : sequence_mismatch;
+            dest[idx].length = 1;
+            first = false;
+        } else {
+            dest[idx].length++;
         }
+        prev_match = is_match;
     }
-    cigar = st_calloc(1, sizeof(Cigar)); // Allocate a cigar record
-    *pCigar = cigar; // Connect the previous cigar to it
-    if(mismatch_run_length) {
-        assert(match_run_length == 0);
-        cigar->op = sequence_mismatch;
-        cigar->length = mismatch_run_length;
-    }
-    if(match_run_length) {
-        assert(mismatch_run_length == 0);
-        cigar->op = sequence_match;
-        cigar->length = match_run_length;
-    }
-    return cigar;
+    return idx + 1;
 }
 
 void paf_encode_mismatches(Paf *paf, char *query_seq, char *target_seq) {
-    Cigar *c = paf->cigar, **pCigar = &(paf->cigar);
-    int64_t i=0, j=paf->target_start;
-    while(c != NULL) {
-        if(c->op == match) {
-            Cigar *c2 = paf_make_match_encoding_mismatches(j, target_seq,
-                                                           paf->same_strand ? paf->query_start+i : paf->query_end-(i+1),
-                                                           query_seq, c->length, paf->same_strand, pCigar);
-            // Update the i and j coordinates
-            i += c->length;
-            j += c->length;
-            // Connect up the new matches
-            c2->next = c->next;
-            // Cleanup the old match
-            free(c);
-            // Now set c to be the end of the new run of matches
-            c = c2;
+    Cigar *cigar = paf->cigar;
+    if(cigar == NULL) return;
+
+    // First pass: count output records
+    int64_t total = 0;
+    int64_t qi = 0, tj = paf->target_start;
+    for(int64_t idx = 0; idx < cigar->length; idx++) {
+        CigarRecord *r = cigar_get(cigar, idx);
+        if(r->op == match) {
+            total += count_mismatch_records(tj, target_seq,
+                        paf->same_strand ? paf->query_start+qi : paf->query_end-(qi+1),
+                        query_seq, r->length, paf->same_strand);
+            qi += r->length;
+            tj += r->length;
+        } else {
+            if(r->op == query_insert) {
+                qi += r->length;
+            } else if(r->op == query_delete) {
+                tj += r->length;
+            } else {
+                assert(r->op == sequence_match || r->op == sequence_mismatch);
+                qi += r->length;
+                tj += r->length;
+            }
+            total++;
         }
-        else if(c->op == query_insert) {
-            i += c->length;
-        }
-        else if (c->op == query_delete) {
-            j += c->length;
-        }
-        else { // Case the paf already has sequence matches and mismatches encoded
-            assert(c->op == sequence_match || c->op == sequence_mismatch);
-            i += c->length;
-            j += c->length;
-        }
-        // Move to the next operation
-        pCigar = &(c->next);
-        c = c->next;
     }
+
+    // Second pass: allocate and fill
+    CigarRecord *new_recs = st_malloc(total * sizeof(CigarRecord));
+    int64_t out = 0;
+    qi = 0; tj = paf->target_start;
+    for(int64_t idx = 0; idx < cigar->length; idx++) {
+        CigarRecord *r = cigar_get(cigar, idx);
+        if(r->op == match) {
+            out += fill_mismatch_records(tj, target_seq,
+                        paf->same_strand ? paf->query_start+qi : paf->query_end-(qi+1),
+                        query_seq, r->length, paf->same_strand, &new_recs[out]);
+            qi += r->length;
+            tj += r->length;
+        } else {
+            new_recs[out++] = *r;
+            if(r->op == query_insert) {
+                qi += r->length;
+            } else if(r->op == query_delete) {
+                tj += r->length;
+            } else {
+                qi += r->length;
+                tj += r->length;
+            }
+        }
+    }
+    assert(out == total);
+
+    // Swap in new array
+    free(cigar->recs);
+    cigar->recs = new_recs;
+    cigar->length = total;
+    cigar->start = 0;
+    cigar->capacity = total;
 }
 
 void paf_remove_mismatches(Paf *paf) {
-    Cigar *c = paf->cigar;
-    while(c != NULL) {
-        if(c->op == sequence_match || c->op == sequence_mismatch) {
-            c->op = match; // relabel it a match
-            while(c->next != NULL && (c->next->op == sequence_match || c->next->op == sequence_mismatch || c->next->op == match)) { // remove any
-                // mismatches / matches
-                Cigar *c2 = c->next;
-                c->length += c2->length;
-                c->next = c2->next;
-                free(c2);
+    Cigar *cigar = paf->cigar;
+    if(cigar == NULL) return;
+    int64_t write = 0;
+    for(int64_t read = 0; read < cigar->length; read++) {
+        CigarRecord *r = cigar_get(cigar, read);
+        if(r->op == sequence_match || r->op == sequence_mismatch || r->op == match) {
+            if(write > 0 && cigar_get(cigar, write - 1)->op == match) {
+                cigar_get(cigar, write - 1)->length += r->length;
+            } else {
+                CigarRecord *w = cigar_get(cigar, write);
+                w->length = r->length;
+                w->op = match;
+                write++;
             }
+        } else {
+            if(write != read) {
+                *cigar_get(cigar, write) = *r;
+            }
+            write++;
         }
-        c = c->next;
     }
+    cigar->length = write;
 }
 
-Cigar *paf_trim_unreliable_ends2(Cigar *c, int64_t *matches, int64_t *mismatches, double identity_threshold,
+static int64_t paf_trim_unreliable_ends2(Cigar *cigar, int64_t *matches, int64_t *mismatches, double identity_threshold,
                                  bool less_than, int64_t max_trim) {
     /*
      * Get the longest prefix with an identity less than the given identity threshold.
-     * Also calculate the number of matches / mismatches in the alignment
+     * Also calculate the number of matches / mismatches in the alignment.
+     * Returns the index of the last element in that prefix, or -1 if no such prefix exists.
      */
     (*matches)=0; (*mismatches)=0;
-    Cigar *c2 = NULL;
-    while(c != NULL) { // For each cigar op in sequence
+    int64_t trim_idx = -1;
+    for(int64_t idx = 0; idx < cigar_count(cigar); idx++) {
+        CigarRecord *c = cigar_get(cigar, idx);
         // First add the op to the number of matches / mismatches
         if(c->op == sequence_match || c->op == match) {
             (*matches) += c->length;
@@ -890,33 +867,31 @@ Cigar *paf_trim_unreliable_ends2(Cigar *c, int64_t *matches, int64_t *mismatches
         if((less_than && prefix_identity < identity_threshold) ||
            (!less_than && prefix_identity >= identity_threshold)) { // Including this op, does the prefix have identity
             // < identity threshold (or >= if less_than is false)
-            c2 = c;
+            trim_idx = idx;
         }
-        c = c->next;
     }
-    return c2; // Return longest prefix with identity < identity threshold
+    return trim_idx; // Return index of longest prefix with identity < identity threshold
 }
 
-void paf_trim_upto(Paf *paf, Cigar *trim_upto) {
+static void paf_trim_upto(Paf *paf, int64_t trim_count) {
     /*
-     * Remove the prefix of cigar operations up to but excluding the given op, trim_upto
+     * Remove the first trim_count cigar records from the front, adjusting coordinates
      */
-    while(paf->cigar != NULL && paf->cigar != trim_upto) {
-        if (paf->cigar->op != query_insert) {
-            paf->target_start += paf->cigar->length;
+    for(int64_t i = 0; i < trim_count; i++) {
+        CigarRecord *r = cigar_get(paf->cigar, i);
+        if (r->op != query_insert) {
+            paf->target_start += r->length;
         }
-        if (paf->cigar->op != query_delete) {
+        if (r->op != query_delete) {
             if (paf->same_strand) {
-                paf->query_start += paf->cigar->length;
+                paf->query_start += r->length;
             } else {
-                paf->query_end -= paf->cigar->length;
+                paf->query_end -= r->length;
             }
         }
-        Cigar *c = paf->cigar;
-        paf->cigar = paf->cigar->next;
-        free(c); // cleanup
     }
-    assert(paf->cigar == trim_upto);
+    paf->cigar->start += trim_count;
+    paf->cigar->length -= trim_count;
 }
 
 void paf_trim_unreliable_prefix(Paf *paf, float identity_threshold, float identity, int64_t max_trim) {
@@ -927,27 +902,38 @@ void paf_trim_unreliable_prefix(Paf *paf, float identity_threshold, float identi
 
     // Calculate largest prefix with identity less than the identity threshold
     int64_t matches, mismatches;
-    Cigar *c = paf_trim_unreliable_ends2(paf->cigar, &matches, &mismatches, identity_threshold, 1, max_trim);
+    int64_t trim_idx = paf_trim_unreliable_ends2(paf->cigar, &matches, &mismatches, identity_threshold, 1, max_trim);
 
-    if(c != NULL) { // If there is a prefix with low identity
+    if(trim_idx >= 0) { // If there is a prefix with low identity
 
-        // Trim back the prefix to avoid chopping off a suffix of the prefix with identity
-        // higher than the given threshold identity
-        paf->cigar = cigar_reverse(paf->cigar); // Reverse the linked list of cigar ops
-        Cigar *c2 = paf_trim_unreliable_ends2(c, &matches, &mismatches, identity, 0, -1); // Get the longest
-                                              // suffix of the prefix with identity >= the identity of the alignment
-        paf->cigar = cigar_reverse(paf->cigar); // Reverse back the linked list of cigar ops
-        if(c2 != NULL) { // If c2 (the longest suffix) is not null, we trim up to c2 but not including it
-            c = c2;
+        // Find the longest suffix of the prefix [0..trim_idx] with identity >= alignment identity
+        // by iterating backward from trim_idx
+        int64_t suffix_matches = 0, suffix_mismatches = 0;
+        int64_t best_suffix_start = -1;
+        for(int64_t i = trim_idx; i >= 0; i--) {
+            CigarRecord *r = cigar_get(paf->cigar, i);
+            if(r->op == sequence_match || r->op == match) {
+                suffix_matches += r->length;
+            } else {
+                suffix_mismatches += r->length;
+            }
+            double suffix_identity = ((float)suffix_matches) / (suffix_matches + suffix_mismatches);
+            if(suffix_identity >= identity) {
+                best_suffix_start = i;
+            }
         }
-        else { // otherwise, we want to trim everything including c, so we set c to c->next so
-            // that we include c in the trim
-            c = c->next;
+
+        int64_t trim_count;
+        if(best_suffix_start >= 0) {
+            trim_count = best_suffix_start; // trim up to but not including best_suffix_start
+        } else {
+            trim_count = trim_idx + 1; // trim everything including trim_idx
         }
 
         // Now trim the prefix
-        assert(c != NULL);
-        paf_trim_upto(paf, c);
+        if(trim_count > 0) {
+            paf_trim_upto(paf, trim_count);
+        }
     }
 }
 

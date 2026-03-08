@@ -164,7 +164,9 @@ int paffy_to_bed_main(int argc, char *argv[]) {
 
     // For each alignment: increase by one the aligned bases count of each base covered by the alignment.
     Paf *paf;
-    while((paf = paf_read(input, 1)) != NULL) {
+    int64_t paf_buffer_length = 100;
+    char *paf_buffer = st_malloc(sizeof(char) * paf_buffer_length);
+    while((paf = paf_read_with_buffer(input, 1, &paf_buffer, &paf_buffer_length)) != NULL) {
         SequenceCountArray *seq_count_array = get_alignment_count_array(seq_names_to_alignment_count_arrays, paf);
         increase_alignment_level_counts(seq_count_array, paf);
 
@@ -176,6 +178,7 @@ int paffy_to_bed_main(int argc, char *argv[]) {
 
         paf_destruct(paf); // Cleanup the old paf record
     }
+    free(paf_buffer);
 
     // Output local alignments file, sorted by score from best-to-worst
     write_bed(output, seq_names_to_alignment_count_arrays, binary, exclude_unaligned, exclude_aligned, min_size);
