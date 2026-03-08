@@ -629,6 +629,107 @@ static void test_cmp_intervals(CuTest *tc) {
     CuAssertTrue(tc, cmp_intervals(&c, &a) > 0);
 }
 
+/* ---- 14. paf_trim_unreliable_tails ---- */
+
+static void test_paf_trim_unreliable_tails_trims_tails(CuTest *tc) {
+    /* "2X5=2X": query span=9, target span=9, same_strand=false.
+     * matches=5, mismatches=4, identity=5/9; score_fraction=0 so threshold=identity.
+     * For same_strand=false the suffix is trimmed via invert+trim+invert:
+     * both 2X tails are removed, leaving "5=", query=(2,7), target=(2,7). */
+    Paf *paf = make_paf("q", 9, 0, 9, false, "t", 9, 0, 9, 5, 9, 60, "2X5=2X");
+    paf_trim_unreliable_tails(paf, 0.0f, 1.0f);
+    CuAssertTrue(tc, paf->query_start  == 2);
+    CuAssertTrue(tc, paf->query_end    == 7);
+    CuAssertTrue(tc, paf->target_start == 2);
+    CuAssertTrue(tc, paf->target_end   == 7);
+    CuAssertIntEquals(tc, 1, cigar_count(paf->cigar));
+    CuAssertIntEquals(tc, sequence_match, cigar_get(paf->cigar, 0)->op);
+    CuAssertTrue(tc, cigar_get(paf->cigar, 0)->length == 5);
+    paf_destruct(paf);
+}
+
+static void test_paf_trim_unreliable_tails_no_trim(CuTest *tc) {
+    /* score_fraction=1.0 → identity_threshold = identity - identity*1 = 0.
+     * No prefix can have identity < 0, so nothing is trimmed. */
+    Paf *paf = make_paf("q", 9, 0, 9, true, "t", 9, 0, 9, 5, 9, 60, "2X5=2X");
+    paf_trim_unreliable_tails(paf, 1.0f, 1.0f);
+    CuAssertTrue(tc, paf->query_start  == 0);
+    CuAssertTrue(tc, paf->query_end    == 9);
+    CuAssertTrue(tc, paf->target_start == 0);
+    CuAssertTrue(tc, paf->target_end   == 9);
+    CuAssertIntEquals(tc, 3, cigar_count(paf->cigar));
+    CuAssertIntEquals(tc, sequence_mismatch, cigar_get(paf->cigar, 0)->op);
+    CuAssertTrue(tc, cigar_get(paf->cigar, 0)->length == 2);
+    CuAssertIntEquals(tc, sequence_match, cigar_get(paf->cigar, 1)->op);
+    CuAssertTrue(tc, cigar_get(paf->cigar, 1)->length == 5);
+    CuAssertIntEquals(tc, sequence_mismatch, cigar_get(paf->cigar, 2)->op);
+    CuAssertTrue(tc, cigar_get(paf->cigar, 2)->length == 2);
+    paf_destruct(paf);
+}
+
+static void test_paf_trim_unreliable_tails_opposite_strand(CuTest *tc) {
+    /* same_strand=false: paf_trim_upto decrements query_end (not query_start)
+     * because the query is on the opposite strand.
+     * "2X5=": query span=7, target span=7, same_strand=false.
+     * identity=5/7; threshold=5/7 (score_fraction=0).
+     * After prefix trim: query_end decremented by 2 to 5; target_start incremented to 2.
+     * The suffix "5=" has identity 1.0 > threshold and is not trimmed. */
+    Paf *paf = make_paf("q", 9, 0, 7, false, "t", 9, 0, 7, 5, 7, 60, "2X5=");
+    paf_trim_unreliable_tails(paf, 0.0f, 1.0f);
+    CuAssertTrue(tc, paf->query_start  == 0);  /* not incremented for opp strand */
+    CuAssertTrue(tc, paf->query_end    == 5);  /* decremented by 2 */
+    CuAssertTrue(tc, paf->target_start == 2);  /* incremented */
+    CuAssertTrue(tc, paf->target_end   == 7);  /* unchanged */
+    CuAssertIntEquals(tc, 1, cigar_count(paf->cigar));
+    CuAssertIntEquals(tc, sequence_match, cigar_get(paf->cigar, 0)->op);
+    CuAssertTrue(tc, cigar_get(paf->cigar, 0)->length == 5);
+    paf_destruct(paf);
+}
+
+/* ---- 15. paf_pretty_print ---- */
+
+static void test_paf_pretty_print_basic(CuTest *tc) {
+    /* Call paf_pretty_print with include_alignment=false and verify that
+     * a non-empty header line is written to the output file. */
+    Paf *paf = make_paf("q", 10, 0, 5, true, "t", 10, 0, 5, 5, 5, 60, "5=");
+    FILE *fh = tmpfile();
+    CuAssertTrue(tc, fh != NULL);
+    paf_pretty_print(paf, NULL, NULL, fh, false);
+    CuAssertTrue(tc, ftell(fh) > 0);  /* output is non-empty */
+    fclose(fh);
+    paf_destruct(paf);
+}
+
+/* ---- 16. paf_check (positive path) ---- */
+
+static void test_paf_check_valid(CuTest *tc) {
+    /* paf_check should not abort on valid records; reaching the end of this
+     * function without st_errAbort is the success criterion. */
+    Paf *p;
+
+    /* same-strand, no cigar */
+    p = make_paf("q", 100, 0, 50, true, "t", 200, 10, 60, 50, 50, 60, NULL);
+    paf_check(p);
+    paf_destruct(p);
+
+    /* opposite-strand, no cigar */
+    p = make_paf("q", 100, 0, 50, false, "t", 200, 10, 60, 50, 50, 60, NULL);
+    paf_check(p);
+    paf_destruct(p);
+
+    /* same-strand with simple cigar */
+    p = make_paf("q", 100, 0, 5, true, "t", 100, 0, 5, 5, 5, 60, "5=");
+    paf_check(p);
+    paf_destruct(p);
+
+    /* cigar with indels: "3=2X1I2D", query span=3+2+1=6, target span=3+2+2=7 */
+    p = make_paf("q", 100, 0, 6, true, "t", 100, 0, 7, 5, 8, 60, "3=2X1I2D");
+    paf_check(p);
+    paf_destruct(p);
+
+    CuAssertTrue(tc, 1);  /* reached here without aborting */
+}
+
 /* ---- Registration ---- */
 
 CuSuite *addPafUnitTestSuite(void) {
@@ -668,5 +769,10 @@ CuSuite *addPafUnitTestSuite(void) {
     SUITE_ADD_TEST(suite, test_coverage_tracking);
     SUITE_ADD_TEST(suite, test_decode_fasta_header);
     SUITE_ADD_TEST(suite, test_cmp_intervals);
+    SUITE_ADD_TEST(suite, test_paf_trim_unreliable_tails_trims_tails);
+    SUITE_ADD_TEST(suite, test_paf_trim_unreliable_tails_no_trim);
+    SUITE_ADD_TEST(suite, test_paf_trim_unreliable_tails_opposite_strand);
+    SUITE_ADD_TEST(suite, test_paf_pretty_print_basic);
+    SUITE_ADD_TEST(suite, test_paf_check_valid);
     return suite;
 }
