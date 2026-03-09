@@ -34,9 +34,14 @@ static int paf_cmp_by_descending_score(const void *a, const void *b) {
 }
 
 static int64_t get_median_alignment_level(uint16_t *counts, Paf *paf) {
-    int64_t i = paf->query_start, max_level=0, matches=0;
-    int64_t *level_counts = st_calloc(UINT16_MAX, sizeof(int64_t)); // An array of counts of the number of bases with the given alignment level
+    // Pre-scan to find the actual max level so we allocate only what we need
+    uint16_t max_level = 0;
+    for(int64_t k = paf->query_start; k < paf->query_end; k++) {
+        if(counts[k] > max_level) max_level = counts[k];
+    }
+    int64_t *level_counts = st_calloc((int64_t)max_level + 2, sizeof(int64_t)); // An array of counts of the number of bases with the given alignment level
     // such that level_counts[i] is the number of bases in the query with level_counts[i] number of alignments to it (at this point in the tiling)
+    int64_t i = paf->query_start, matches=0;
     for(int64_t ci = 0; ci < cigar_count(paf->cigar); ci++) {
         CigarRecord *c = cigar_get(paf->cigar, ci);
         if(c->op != query_delete) {
@@ -47,9 +52,6 @@ static int64_t get_median_alignment_level(uint16_t *counts, Paf *paf) {
                     assert(counts[i + j] < UINT16_MAX); // paranoid check
                     level_counts[counts[i + j]]++;
                     matches++;
-                    if(counts[i + j] > max_level) {
-                        max_level = counts[i + j];
-                    }
                 }
             }
             i += c->length;
