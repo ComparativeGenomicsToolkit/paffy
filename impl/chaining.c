@@ -9,12 +9,40 @@ static int intcmp(int64_t i, int64_t j) {
 }
 
 /*
+ * Anchor weight for chaining.  The DP maximises sum(weight) - sum(gap_cost), so
+ * every alignment needs a STRICTLY POSITIVE pulling weight: with weight 0 an
+ * alignment can never adopt a predecessor (both the g < weight gate and the
+ * chain_score > best test fail), and even an exactly-abutting collinear run
+ * shatters into one chain per record.  paf->score comes solely from the
+ * optional AS:i: tag -- it defaults to 0 when the tag is absent (st_calloc) and
+ * an upstream tool can set it <= 0 -- so floor the weight at the alignment's
+ * matched length (num_matches), a positive, trim-independent measure of how
+ * much real alignment the block contributes (cf. minimap2's q_span and the
+ * taffy port, which weight purely by length).  When AS is present it dominates
+ * (lastz AS/num_matches is ~5-90), so the floor never binds and AS-scored input
+ * chains exactly as before.
+ */
+static int64_t paf_chain_weight(Paf *p) {
+    int64_t length_floor = p->num_matches > 0 ? p->num_matches : 1;
+    return p->score > length_floor ? p->score : length_floor;
+}
+
+/*
  * Compare two pafs by query start coordinates - Note: doesn't care about query sequence name
  */
 static int paf_cmp_by_query_location(const void *a, const void *b) {
     Paf *p1 = (Paf *)a, *p2 = (Paf *)b;
     int i = intcmp(p1->query_start, p2->query_start);
-    if(i == 0) { // if equal, compare by pointer to ensure any two different pafs are not considered equal
+    // TOTAL value order on equal query_start: the sweep iterates in this order
+    // and ties decide chain membership, so a pointer (heap-address) tiebreak
+    // made chaining non-deterministic across runs and builds.  Break by the
+    // remaining coords; the pointer survives only as the last resort for
+    // exact-duplicate pafs (immaterial -- they chain identically).
+    if(i == 0) i = intcmp(p1->query_end, p2->query_end);
+    if(i == 0) i = strcmp(p1->target_name, p2->target_name);
+    if(i == 0) i = intcmp(p1->target_start, p2->target_start);
+    if(i == 0) i = intcmp(p1->target_end, p2->target_end);
+    if(i == 0) {
         i = intcmp((int64_t)p1, (int64_t)p2);
     }
     return i;
@@ -44,7 +72,11 @@ static int chain_cmp_by_location(const void *a, const void *b) {
             i = intcmp(p1->target_end, p2->target_end);
             if (i == 0) {
                 i = intcmp(p1->query_end, p2->query_end);
-                if(i == 0) { // if equal, compare by pointer to ensure any two different pafs are not considered equal
+                // TOTAL value order before the pointer last-resort, so the
+                // active-set / predecessor-scan order is independent of layout.
+                if(i == 0) i = intcmp(p1->query_start, p2->query_start);
+                if(i == 0) i = intcmp(p1->target_start, p2->target_start);
+                if(i == 0) { // exact-duplicate pafs only (immaterial)
                     i = intcmp((int64_t)p1, (int64_t)p2);
                 }
             }
@@ -59,8 +91,15 @@ static int chain_cmp_by_location(const void *a, const void *b) {
 static int chain_cmp_by_score(const void *a, const void *b) {
     Chain *c1 = (Chain *)a, *c2 = (Chain *)b;
     int64_t i = intcmp(c1->score, c2->score);
-    if(i == 0) { // if equal, compare by pointer to ensure any two different pafs are not considered equal
-        i = intcmp((int64_t)c1, (int64_t)c2);
+    if(i == 0) { // TOTAL value order on the rep paf's coords so the pop order --
+                 // and thus chain-id assignment -- is independent of heap layout;
+                 // pointer is the last resort for exact-duplicate pafs only.
+        Paf *p1 = c1->paf, *p2 = c2->paf;
+        i = intcmp(p1->query_start, p2->query_start);
+        if(i == 0) i = intcmp(p1->target_start, p2->target_start);
+        if(i == 0) i = intcmp(p1->query_end, p2->query_end);
+        if(i == 0) i = intcmp(p1->target_end, p2->target_end);
+        if(i == 0) i = intcmp((int64_t)c1, (int64_t)c2);
     }
     return i;
 }
@@ -70,7 +109,15 @@ static int chain_cmp_by_score(const void *a, const void *b) {
  */
 static stSortedSetIterator *get_predecessor_chains(stSortedSet *active_chained_alignments, Chain *chain) {
     int64_t i=chain->paf->query_end, j=chain->paf->target_end;
-    chain->paf->query_end = chain->paf->query_start;
+    /* query_end is the SECONDARY sort key (after target_end) in
+     * chain_cmp_by_location.  Setting it to query_start makes an exactly-
+     * abutting predecessor (target_end==target_start AND query_end==query_start)
+     * tie on both coords and fall through to the (int64_t)pointer tiebreak, so
+     * searchLessThanOrEqual includes/excludes it by HEAP ADDRESS and the chain
+     * shatters at zero-cost boundaries.  INT64_MAX sorts the search key above
+     * every real node at target_end==target_start, so all abutting predecessors
+     * are reached (the walk below filters genuine overlaps). */
+    chain->paf->query_end = INT64_MAX;
     chain->paf->target_end = chain->paf->target_start;
     Chain *chain2 = stSortedSet_searchLessThanOrEqual(active_chained_alignments, chain);
     chain->paf->query_end = i;
@@ -88,7 +135,7 @@ static stSortedSetIterator *get_predecessor_chains(stSortedSet *active_chained_a
 int64_t get_chain_score(Chain *chain, int64_t (*gap_cost)(int64_t, int64_t, void *),
                         void *gap_cost_params) {
     Paf *p = chain->paf;
-    int64_t total_score = p->score;
+    int64_t total_score = paf_chain_weight(p);
 
     while(chain->pChain != NULL) { // Join together links in the chain
         Paf *q = p;
@@ -104,7 +151,7 @@ int64_t get_chain_score(Chain *chain, int64_t (*gap_cost)(int64_t, int64_t, void
         assert(q->target_start - p->target_end >= 0);
 
         // set the score
-        total_score += p->score - gap_cost(q->query_start - p->query_end, q->target_start - p->target_end, gap_cost_params);
+        total_score += paf_chain_weight(p) - gap_cost(q->query_start - p->query_end, q->target_start - p->target_end, gap_cost_params);
 
         // Shift back to the prior link in the chain and cleanup
         chain = chain->pChain;
@@ -151,7 +198,7 @@ static stList *paf_chain_ignore_strand(stList *pafs, int64_t (*gap_cost)(int64_t
         Paf *paf = stList_get(pafs, i);
         Chain *chain = st_calloc(1, sizeof(Chain));
         chain->paf = paf;
-        chain->score = paf->score;
+        chain->score = paf_chain_weight(paf);
 
         // Find highest scoring chains that alignment could be chained with:
         stSortedSetIterator *it = get_predecessor_chains(active_chained_alignments, chain); // This is an iterator over chains that the alignment could be joined to
@@ -191,8 +238,9 @@ static stList *paf_chain_ignore_strand(stList *pafs, int64_t (*gap_cost)(int64_t
             } else { // We can chain to this alignment
                 int64_t g = gap_cost(paf->query_start - pChain->paf->query_end,
                                      paf->target_start - pChain->paf->target_end, gap_cost_params);
-                int64_t chain_score = paf->score + pChain->score - g;
-                if (g < paf->score && chain_score > chain->score) { // If the gap cost is less than the cost of the next
+                int64_t w = paf_chain_weight(paf);
+                int64_t chain_score = w + pChain->score - g;
+                if (g < w && chain_score > chain->score) { // If the gap cost is less than the cost of the next
                     // alignment and the chain is the best score seen so far
                     chain->score = chain_score;
                     chain->pChain = pChain;
