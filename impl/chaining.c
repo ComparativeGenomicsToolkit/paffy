@@ -14,7 +14,16 @@ static int intcmp(int64_t i, int64_t j) {
 static int paf_cmp_by_query_location(const void *a, const void *b) {
     Paf *p1 = (Paf *)a, *p2 = (Paf *)b;
     int i = intcmp(p1->query_start, p2->query_start);
-    if(i == 0) { // if equal, compare by pointer to ensure any two different pafs are not considered equal
+    // TOTAL value order on equal query_start: the sweep iterates in this order
+    // and ties decide chain membership, so a pointer (heap-address) tiebreak
+    // made chaining non-deterministic across runs and builds.  Break by the
+    // remaining coords; the pointer survives only as the last resort for
+    // exact-duplicate pafs (immaterial -- they chain identically).
+    if(i == 0) i = intcmp(p1->query_end, p2->query_end);
+    if(i == 0) i = strcmp(p1->target_name, p2->target_name);
+    if(i == 0) i = intcmp(p1->target_start, p2->target_start);
+    if(i == 0) i = intcmp(p1->target_end, p2->target_end);
+    if(i == 0) {
         i = intcmp((int64_t)p1, (int64_t)p2);
     }
     return i;
@@ -44,7 +53,11 @@ static int chain_cmp_by_location(const void *a, const void *b) {
             i = intcmp(p1->target_end, p2->target_end);
             if (i == 0) {
                 i = intcmp(p1->query_end, p2->query_end);
-                if(i == 0) { // if equal, compare by pointer to ensure any two different pafs are not considered equal
+                // TOTAL value order before the pointer last-resort, so the
+                // active-set / predecessor-scan order is independent of layout.
+                if(i == 0) i = intcmp(p1->query_start, p2->query_start);
+                if(i == 0) i = intcmp(p1->target_start, p2->target_start);
+                if(i == 0) { // exact-duplicate pafs only (immaterial)
                     i = intcmp((int64_t)p1, (int64_t)p2);
                 }
             }
@@ -59,8 +72,15 @@ static int chain_cmp_by_location(const void *a, const void *b) {
 static int chain_cmp_by_score(const void *a, const void *b) {
     Chain *c1 = (Chain *)a, *c2 = (Chain *)b;
     int64_t i = intcmp(c1->score, c2->score);
-    if(i == 0) { // if equal, compare by pointer to ensure any two different pafs are not considered equal
-        i = intcmp((int64_t)c1, (int64_t)c2);
+    if(i == 0) { // TOTAL value order on the rep paf's coords so the pop order --
+                 // and thus chain-id assignment -- is independent of heap layout;
+                 // pointer is the last resort for exact-duplicate pafs only.
+        Paf *p1 = c1->paf, *p2 = c2->paf;
+        i = intcmp(p1->query_start, p2->query_start);
+        if(i == 0) i = intcmp(p1->target_start, p2->target_start);
+        if(i == 0) i = intcmp(p1->query_end, p2->query_end);
+        if(i == 0) i = intcmp(p1->target_end, p2->target_end);
+        if(i == 0) i = intcmp((int64_t)c1, (int64_t)c2);
     }
     return i;
 }
