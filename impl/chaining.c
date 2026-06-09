@@ -9,6 +9,25 @@ static int intcmp(int64_t i, int64_t j) {
 }
 
 /*
+ * Anchor weight for chaining.  The DP maximises sum(weight) - sum(gap_cost), so
+ * every alignment needs a STRICTLY POSITIVE pulling weight: with weight 0 an
+ * alignment can never adopt a predecessor (both the g < weight gate and the
+ * chain_score > best test fail), and even an exactly-abutting collinear run
+ * shatters into one chain per record.  paf->score comes solely from the
+ * optional AS:i: tag -- it defaults to 0 when the tag is absent (st_calloc) and
+ * an upstream tool can set it <= 0 -- so floor the weight at the alignment's
+ * matched length (num_matches), a positive, trim-independent measure of how
+ * much real alignment the block contributes (cf. minimap2's q_span and the
+ * taffy port, which weight purely by length).  When AS is present it dominates
+ * (lastz AS/num_matches is ~5-90), so the floor never binds and AS-scored input
+ * chains exactly as before.
+ */
+static int64_t paf_chain_weight(Paf *p) {
+    int64_t length_floor = p->num_matches > 0 ? p->num_matches : 1;
+    return p->score > length_floor ? p->score : length_floor;
+}
+
+/*
  * Compare two pafs by query start coordinates - Note: doesn't care about query sequence name
  */
 static int paf_cmp_by_query_location(const void *a, const void *b) {
@@ -116,7 +135,7 @@ static stSortedSetIterator *get_predecessor_chains(stSortedSet *active_chained_a
 int64_t get_chain_score(Chain *chain, int64_t (*gap_cost)(int64_t, int64_t, void *),
                         void *gap_cost_params) {
     Paf *p = chain->paf;
-    int64_t total_score = p->score;
+    int64_t total_score = paf_chain_weight(p);
 
     while(chain->pChain != NULL) { // Join together links in the chain
         Paf *q = p;
@@ -132,7 +151,7 @@ int64_t get_chain_score(Chain *chain, int64_t (*gap_cost)(int64_t, int64_t, void
         assert(q->target_start - p->target_end >= 0);
 
         // set the score
-        total_score += p->score - gap_cost(q->query_start - p->query_end, q->target_start - p->target_end, gap_cost_params);
+        total_score += paf_chain_weight(p) - gap_cost(q->query_start - p->query_end, q->target_start - p->target_end, gap_cost_params);
 
         // Shift back to the prior link in the chain and cleanup
         chain = chain->pChain;
@@ -179,7 +198,7 @@ static stList *paf_chain_ignore_strand(stList *pafs, int64_t (*gap_cost)(int64_t
         Paf *paf = stList_get(pafs, i);
         Chain *chain = st_calloc(1, sizeof(Chain));
         chain->paf = paf;
-        chain->score = paf->score;
+        chain->score = paf_chain_weight(paf);
 
         // Find highest scoring chains that alignment could be chained with:
         stSortedSetIterator *it = get_predecessor_chains(active_chained_alignments, chain); // This is an iterator over chains that the alignment could be joined to
@@ -219,8 +238,9 @@ static stList *paf_chain_ignore_strand(stList *pafs, int64_t (*gap_cost)(int64_t
             } else { // We can chain to this alignment
                 int64_t g = gap_cost(paf->query_start - pChain->paf->query_end,
                                      paf->target_start - pChain->paf->target_end, gap_cost_params);
-                int64_t chain_score = paf->score + pChain->score - g;
-                if (g < paf->score && chain_score > chain->score) { // If the gap cost is less than the cost of the next
+                int64_t w = paf_chain_weight(paf);
+                int64_t chain_score = w + pChain->score - g;
+                if (g < w && chain_score > chain->score) { // If the gap cost is less than the cost of the next
                     // alignment and the chain is the best score seen so far
                     chain->score = chain_score;
                     chain->pChain = pChain;
