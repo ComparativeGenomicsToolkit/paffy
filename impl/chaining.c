@@ -70,7 +70,15 @@ static int chain_cmp_by_score(const void *a, const void *b) {
  */
 static stSortedSetIterator *get_predecessor_chains(stSortedSet *active_chained_alignments, Chain *chain) {
     int64_t i=chain->paf->query_end, j=chain->paf->target_end;
-    chain->paf->query_end = chain->paf->query_start;
+    /* query_end is the SECONDARY sort key (after target_end) in
+     * chain_cmp_by_location.  Setting it to query_start makes an exactly-
+     * abutting predecessor (target_end==target_start AND query_end==query_start)
+     * tie on both coords and fall through to the (int64_t)pointer tiebreak, so
+     * searchLessThanOrEqual includes/excludes it by HEAP ADDRESS and the chain
+     * shatters at zero-cost boundaries.  INT64_MAX sorts the search key above
+     * every real node at target_end==target_start, so all abutting predecessors
+     * are reached (the walk below filters genuine overlaps). */
+    chain->paf->query_end = INT64_MAX;
     chain->paf->target_end = chain->paf->target_start;
     Chain *chain2 = stSortedSet_searchLessThanOrEqual(active_chained_alignments, chain);
     chain->paf->query_end = i;
