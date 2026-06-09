@@ -86,16 +86,16 @@ int paffy_chain_main(int argc, char *argv[]) {
                 outputFile = optarg;
                 break;
             case 'g':
-                max_gap_length = atoi(optarg);
+                max_gap_length = atoll(optarg);
                 break;
             case 't':
                 percentage_to_trim = atof(optarg);
                 break;
             case 'd':
-                chain_gap_open = atoi(optarg);
+                chain_gap_open = atoll(optarg);
                 break;
             case 'e':
-                chain_gap_extend = atoi(optarg);
+                chain_gap_extend = atoll(optarg);
                 break;
             case 'h':
                 usage();
