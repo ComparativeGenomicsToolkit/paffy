@@ -243,7 +243,7 @@ int faffy_extract_main(int argc, char *argv[]) {
         fclose(input);
     }
     if(output_file != NULL) {
-        fclose(output);
+        st_fclose(output, output_file);
     }
 
     st_logInfo("Faffy extract is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);

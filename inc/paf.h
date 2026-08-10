@@ -160,6 +160,21 @@ void paf_write(Paf *paf, FILE *fh);
  */
 void paf_write_with_buffer(Paf *paf, FILE *fh, char **paf_buffer, int64_t *paf_length_buffer);
 
+/*
+ * Arrange for standard output to be checked when the program exits.
+ *
+ * Most subcommands write their result to stdout and leave it to the caller to
+ * redirect, and stdio reports a failed write -- a full disk, a quota, a
+ * read-only mount -- only by setting an error indicator that nothing is
+ * obliged to read.  At normal exit the C library flushes stdout and throws any
+ * error away, so without this a truncated file and a complete one are
+ * indistinguishable and the tool still exits successfully.  A short PAF is
+ * still a valid PAF.
+ *
+ * Call once, at the top of main.
+ */
+void paf_check_stdout_at_exit(void);
+
 
 /*
  * Checks a paf alignment coordinates and cigar are valid, error aborts if not.

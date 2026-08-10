@@ -198,7 +198,7 @@ int paffy_to_bed_main(int argc, char *argv[]) {
         fclose(input);
     }
     if(outputFile != NULL) {
-        fclose(output);
+        st_fclose(output, outputFile);
     }
     if(query_fasta_file != NULL) {
         fclose(query_fasta);
