@@ -170,7 +170,7 @@ int faffy_merge_main(int argc, char *argv[]) {
         fclose(input);
     }
     if(outputFile != NULL) {
-        fclose(output);
+        st_fclose(output, outputFile);
     }
 
     st_logInfo("Faffy merge is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);

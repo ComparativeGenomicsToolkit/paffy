@@ -152,7 +152,7 @@ int paffy_dedupe_main(int argc, char *argv[]) {
         fclose(input);
     }
     if(outputFile != NULL) {
-        fclose(output);
+        st_fclose(output, outputFile);
     }
     stHash_destruct(pafs);
 

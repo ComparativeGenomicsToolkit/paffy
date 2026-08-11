@@ -186,14 +186,23 @@ static FILE *get_output_file(stHash *target_to_file, const char *target_name, co
      char *key;
      while ((key = stHash_getNext(it)) != NULL) {
          FILE *fh = stHash_search(contig_to_file, key);
-         fclose(fh);
+         // rebuilt the way get_output_file built it, so a failure names the
+         // file rather than the contig
+         char *sanitized = sanitize_filename(key);
+         char *filename = stString_print("%s%s.paf", prefix, sanitized);
+         st_fclose(fh, filename);
+         free(sanitized);
+         free(filename);
      }
      stHash_destructIterator(it);
      stHash_destruct(contig_to_file);
 
      // Close all small contig output files
+     // appended in index order, so entry i is the file named small_<i>.paf
      for (int64_t i = 0; i < stList_length(small_files); i++) {
-         fclose(stList_get(small_files, i));
+         char *filename = stString_print("%ssmall_%" PRIi64 ".paf", prefix, i);
+         st_fclose(stList_get(small_files, i), filename);
+         free(filename);
      }
      stList_destruct(small_files);
      stHash_destruct(small_contig_to_file);

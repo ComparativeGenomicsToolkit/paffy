@@ -23,6 +23,10 @@ void usage(void) {
 }
 
 int main(int argc, char *argv[]) {
+    // chunk and extract write their fasta to stdout unless given -o, and a
+    // failed write there is otherwise reported to nobody
+    paf_check_stdout_at_exit();
+
     if (argc < 2) {
         usage();
         return 0;

@@ -167,7 +167,7 @@ int paffy_upconvert_main(int argc, char *argv[]) {
         fclose(input);
     }
     if(output_file != NULL) {
-        fclose(output);
+        st_fclose(output, output_file);
     }
 
     st_logInfo("Paf upconvert is done!, %" PRIi64 " seconds have elapsed\n", time(NULL) - startTime);

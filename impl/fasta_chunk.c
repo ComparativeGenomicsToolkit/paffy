@@ -51,7 +51,10 @@ static void startChunkingSequences(void) {
 
 static void finishChunkingSequences(void) {
     if (chunkFileHandle != NULL) {
-        fclose(chunkFileHandle);
+        // the name is printed below as the signal that this chunk is complete,
+        // so the close has to be checked before that claim is made -- otherwise
+        // a truncated chunk is advertised to the rest of the pipeline as whole
+        st_fclose(chunkFileHandle, tempChunkFile);
         st_logDebug("Finishing chunk %s\n", tempChunkFile);
         fprintf(stdout, "%s\n", tempChunkFile); // Print the output file to stdout
         free(tempChunkFile);

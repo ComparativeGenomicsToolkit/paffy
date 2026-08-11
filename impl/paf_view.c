@@ -204,7 +204,7 @@ int paffy_view_main(int argc, char *argv[]) {
         fclose(input);
     }
     if(outputFile != NULL) {
-        fclose(output);
+        st_fclose(output, outputFile);
     }
     stHash_destruct(sequences);
 

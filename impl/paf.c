@@ -1,5 +1,6 @@
 #include "paf.h"
 #include <ctype.h>
+#include <stdlib.h>
 #include "bioioC.h"
 
 /*
@@ -402,7 +403,13 @@ void paf_write_with_buffer(Paf *paf, FILE *fh, char **paf_buffer, int64_t *paf_l
         *paf_buffer = realloc(*paf_buffer, *paf_length_buffer);
     }
     int64_t i = paf_write_to_buffer(paf, *paf_buffer);
-    fwrite(*paf_buffer, 1, i, fh);
+    // a short write means the record did not land; carrying on would silently
+    // drop this alignment and every one after it.  stderr is exempt: it carries
+    // debug output here, and failing a run because a log line could not be
+    // written would be worse than losing the line
+    if(fwrite(*paf_buffer, 1, i, fh) != (size_t)i && fh != stderr) {
+        st_errnoAbort("Failed to write a PAF record, so the output is incomplete");
+    }
 }
 
 void paf_write(Paf *paf, FILE *fh) {
@@ -410,9 +417,33 @@ void paf_write(Paf *paf, FILE *fh) {
     char stack_buf[4096];
     char *buf = buf_size <= 4096 ? stack_buf : st_malloc(buf_size); // Use stack buffer for small records, heap for large cigars
     int64_t i = paf_write_to_buffer(paf, buf);
-    fwrite(buf, 1, i, fh);
+    if(fwrite(buf, 1, i, fh) != (size_t)i && fh != stderr) {
+        st_errnoAbort("Failed to write a PAF record, so the output is incomplete");
+    }
     if(buf_size > 4096) {
         free(buf);
+    }
+}
+
+static void paf_stdout_exit_check(void) {
+    // atexit handlers run before the C library flushes the streams, so the
+    // flush has to happen here for the error indicator to mean anything.
+    //
+    // st_errAbort cannot be used: it calls exit(), and calling exit() from an
+    // atexit handler is undefined behaviour.  _Exit skips the second flush,
+    // which has already been tried and failed, and skips the remaining
+    // handlers, which is what we want on a dead output stream.
+    if(fflush(stdout) != 0 || ferror(stdout)) {
+        fprintf(stderr, "ERROR: Failed to write to standard output, so its contents are "
+                        "incomplete. Check the free space, the quota and the permissions "
+                        "on the file system holding it.\n");
+        _Exit(EXIT_FAILURE);
+    }
+}
+
+void paf_check_stdout_at_exit(void) {
+    if(atexit(paf_stdout_exit_check) != 0) {
+        st_errAbort("Could not install the standard output check");
     }
 }
 
