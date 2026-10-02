@@ -51,6 +51,10 @@ paffy add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paffy vi
 echo "adding and then remove mismatches"
 paffy add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paffy add_mismatches -a | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 530000
 
+# Run paffy left_align (moving gaps leaves identity and coverage as they were)
+echo "paffy left_align minimum local alignment identity"
+paffy left_align -i ${working_dir}/output.paf ${working_dir}/*.fa | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 530000
+
 # Run paffy view with trim (identity may be higher as we trim the tails)
 echo "paffy trim minimum local alignment identity"
 paffy add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paffy trim -r 0.05 | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 446000

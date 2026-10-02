@@ -13,6 +13,7 @@ extern int paffy_chain_main(int argc, char *argv[]);
 extern int paffy_dechunk_main(int argc, char *argv[]);
 extern int paffy_dedupe_main(int argc, char *argv[]);
 extern int paffy_invert_main(int argc, char *argv[]);
+extern int paffy_left_align_main(int argc, char *argv[]);
 extern int paffy_shatter_main(int argc, char *argv[]);
 extern int paffy_tile_main(int argc, char *argv[]);
 extern int paffy_to_bed_main(int argc, char *argv[]);
@@ -32,6 +33,7 @@ void usage(void) {
     fprintf(stderr, "    dedupe                   Remove duplicate alignments from a file based on exact query/target coordinates\n");
     fprintf(stderr, "    filter                   Filter alignments based upon alignment stats\n");
     fprintf(stderr, "    invert                   Switch query and target coordinates\n");
+    fprintf(stderr, "    left_align               Move gaps as far left on the target as the sequences allow\n");
     fprintf(stderr, "    shatter                  Break PAFs into sequence of gapless PAF alignments\n");
     fprintf(stderr, "    tile                     Give alignments levels, from lowest (best) to highest (worse) by greedily picking\n"
                     "                             the best alignment at each location\n");
@@ -63,6 +65,8 @@ int main(int argc, char *argv[]) {
         return paffy_dedupe_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "invert") == 0) {
         return paffy_invert_main(argc - 1, argv + 1);
+    } else if (strcmp(argv[1], "left_align") == 0) {
+        return paffy_left_align_main(argc - 1, argv + 1);
     }else if (strcmp(argv[1], "filter") == 0) {
         return paffy_filter_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "shatter") == 0) {

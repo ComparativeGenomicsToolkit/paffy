@@ -839,6 +839,104 @@ void paf_remove_mismatches(Paf *paf) {
     cigar->length = write;
 }
 
+/*
+ * Base i of the query as it is aligned, which on the opposite strand is the reverse complement read back from
+ * query_end (as in paf_encode_mismatches)
+ */
+static inline char paf_aligned_query_base(Paf *paf, char *query_seq, int64_t i) {
+    return toupper(paf->same_strand ? query_seq[paf->query_start + i]
+                                    : stString_reverseComplementChar(query_seq[paf->query_end - 1 - i]));
+}
+
+int64_t paf_left_align(Paf *paf, char *query_seq, char *target_seq) {
+    Cigar *cigar = paf->cigar;
+    if(cigar == NULL) return 0;
+
+    // The output is built as a stack, so a gap can slide back into the runs already written. Each input op pushes
+    // at most two records: itself, and the run a gap leaves behind it when it moves.
+    int64_t capacity = 2 * cigar->length + 1;
+    CigarRecord *out = st_malloc(capacity * sizeof(CigarRecord));
+    int64_t n = 0;
+    int64_t q = 0, t = 0; // offsets of the next input op into the aligned query and the target
+    int64_t gaps_moved = 0;
+    // A moved gap reorders the =/X runs around it, so diagonals are worked on as M and re-encoded at the end
+    bool encoded = false;
+
+    for(int64_t idx = 0; idx < cigar->length; idx++) {
+        CigarRecord *r = cigar_get(cigar, idx);
+        int64_t len = r->length;
+        if(len == 0) {
+            continue;
+        }
+        if(r->op == match || r->op == sequence_match || r->op == sequence_mismatch) {
+            encoded = encoded || r->op != match;
+            if(n > 0 && out[n-1].op == match) {
+                out[n-1].length += len;
+            } else {
+                out[n].op = match; out[n].length = len; n++;
+            }
+            q += len; t += len;
+            continue;
+        }
+
+        CigarOp op = r->op;
+        int64_t gq = q, gt = t; // where the gap starts
+        if(op == query_insert) { q += len; } else { t += len; }
+        if(n > 0 && out[n-1].op == op) { // two gaps of a kind in a row are one gap
+            n--;
+            len += out[n].length;
+            if(op == query_insert) { gq -= out[n].length; } else { gt -= out[n].length; }
+        }
+
+        // Moving the gap one base left carries the diagonal column before it to just after it. For a delete that
+        // column's query base now faces the gap's last target base instead of the one before the gap, and for an
+        // insert its target base faces the gap's last query base. Requiring those two bases to be equal leaves
+        // every column's pair of bases, and so the alignment's score, unchanged.
+        int64_t moved = 0;
+        while(n > 0 && out[n-1].op == match) {
+            char before, last;
+            if(op == query_delete) {
+                before = toupper(target_seq[paf->target_start + gt - 1]);
+                last = toupper(target_seq[paf->target_start + gt + len - 1]);
+            } else {
+                before = paf_aligned_query_base(paf, query_seq, gq - 1);
+                last = paf_aligned_query_base(paf, query_seq, gq + len - 1);
+            }
+            if(before != last) {
+                break;
+            }
+            // Emptying the run is only allowed when it joins us to a gap of the same kind: otherwise the
+            // alignment would start with a gap, or have an insert against a delete
+            if(out[n-1].length == 1 && !(n >= 2 && out[n-2].op == op)) {
+                break;
+            }
+            out[n-1].length--; gq--; gt--; moved++;
+            if(out[n-1].length == 0) {
+                n -= 2; // drop the empty run and take in the gap it separated us from
+                len += out[n].length;
+                if(op == query_insert) { gq -= out[n].length; } else { gt -= out[n].length; }
+            }
+        }
+        out[n].op = op; out[n].length = len; n++;
+        if(moved > 0) {
+            out[n].op = match; out[n].length = moved; n++;
+            gaps_moved++;
+        }
+        assert(n <= capacity);
+    }
+
+    free(cigar->recs);
+    cigar->recs = out;
+    cigar->length = n;
+    cigar->start = 0;
+    cigar->capacity = capacity;
+
+    if(encoded) {
+        paf_encode_mismatches(paf, query_seq, target_seq);
+    }
+    return gaps_moved;
+}
+
 static int64_t paf_trim_unreliable_ends2(Cigar *cigar, int64_t *matches, int64_t *mismatches, double identity_threshold,
                                  bool less_than, int64_t max_trim) {
     /*
