@@ -55,6 +55,12 @@ paffy add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paffy ad
 echo "paffy left_align minimum local alignment identity"
 paffy left_align -i ${working_dir}/output.paf ${working_dir}/*.fa | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 530000
 
+# Run paffy left_align on records carrying a tag paffy does not parse: everything but the cigar comes through as it was
+echo "paffy left_align keeps the rest of each record"
+awk 'BEGIN{OFS="\t"} {print $0, "rc:Z:x"NR}' ${working_dir}/output.paf > ${working_dir}/tagged.paf
+paffy left_align -i ${working_dir}/tagged.paf ${working_dir}/*.fa > ${working_dir}/tagged.left.paf
+diff <(sed 's/\tcg:Z:[^\t]*//' ${working_dir}/tagged.paf) <(sed 's/\tcg:Z:[^\t]*//' ${working_dir}/tagged.left.paf)
+
 # Run paffy view with trim (identity may be higher as we trim the tails)
 echo "paffy trim minimum local alignment identity"
 paffy add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paffy trim -r 0.05 | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 446000

@@ -8,6 +8,10 @@
  * mirrored places on the two strands). Aligning every gap to the left of the target's forward strand
  * gives alignments to the same target one representation of each indel.
  *
+ * Only the cigar changes, so each record is written back exactly as it was read with only its cg:Z: tag
+ * replaced. That keeps the tags paffy does not parse, such as the rc:Z:, gm:i:, gl:i: and gi:f: that gaf2paf
+ * adds and cactus reads, which a round trip through paf_write would drop.
+ *
  * Overview:
  * (1) Load query and target sequences
  * (2) For each input PAF record left-align the gaps
@@ -17,6 +21,34 @@
 #include <getopt.h>
 #include <time.h>
 #include "bioioC.h"
+
+/*
+ * Write line, a PAF record without its newline, with its cg:Z: tag replaced by the given cigar
+ */
+static void write_with_cigar(FILE *output, char *line, Cigar *cigar) {
+    static const char ops[] = { 'M', 'I', 'D', '=', 'X' };
+    char *field = line;
+    bool first = true;
+    while (field != NULL) {
+        char *tab = strchr(field, '\t');
+        int64_t len = tab == NULL ? (int64_t)strlen(field) : tab - field;
+        if (!first) {
+            fputc('\t', output);
+        }
+        first = false;
+        if (len >= 5 && strncmp(field, "cg:Z:", 5) == 0) {
+            fputs("cg:Z:", output);
+            for (int64_t i = 0; i < cigar_count(cigar); i++) {
+                CigarRecord *r = cigar_get(cigar, i);
+                fprintf(output, "%" PRIi64 "%c", (int64_t)r->length, ops[r->op]);
+            }
+        } else {
+            fwrite(field, 1, len, output);
+        }
+        field = tab == NULL ? NULL : tab + 1;
+    }
+    fputc('\n', output);
+}
 
 static void usage(void) {
     fprintf(stderr, "paffy left_align [fasta_files]xN [options], version 0.1\n");
@@ -109,10 +141,19 @@ int paffy_left_align_main(int argc, char *argv[]) {
     }
 
     int64_t records = 0, gaps_moved = 0;
-    Paf *paf;
-    int64_t paf_buffer_length = 100;
-    char *paf_buffer = st_malloc(sizeof(char) * paf_buffer_length);
-    while((paf = paf_read_with_buffer(input, 1, &paf_buffer, &paf_buffer_length)) != NULL) {
+    int64_t line_capacity = 100;
+    char *line = st_malloc(line_capacity);
+    while(1) { // read as paf_read_with_buffer does, keeping the line
+        int64_t i = stFile_getLineFromFileWithBufferUnlocked(&line, &line_capacity, input);
+        if(i == -1 && strlen(line) == 0) {
+            break;
+        }
+        if(strlen(line) == 0) {
+            continue;
+        }
+        char *copy = stString_copy(line); // paf_parse tokenizes its input in place
+        Paf *paf = paf_parse(copy, 1);
+        free(copy);
         if(paf->cigar != NULL) {
             char *query_seq = stHash_search(sequences, paf->query_name);
             if(query_seq == NULL) {
@@ -125,17 +166,16 @@ int paffy_left_align_main(int argc, char *argv[]) {
                 exit(1);
             }
             gaps_moved += paf_left_align(paf, query_seq, target_seq);
+            paf_check(paf);
+            write_with_cigar(output, line, paf->cigar);
+        } else {
+            fprintf(output, "%s\n", line);
         }
-
-        // Check all is good
-        paf_check(paf);
-
-        paf_write_with_buffer(paf, output, &paf_buffer, &paf_buffer_length);
 
         paf_destruct(paf);
         records++;
     }
-    free(paf_buffer);
+    free(line);
 
     //////////////////////////////////////////////
     // Cleanup
