@@ -288,6 +288,15 @@ void paf_remove_mismatches(Paf *paf);
 int64_t paf_left_align(Paf *paf, char *query_seq, char *target_seq);
 
 /*
+ * As paf_left_align, but a gap goes to whichever end of the stretch it can slide along makes that stretch read
+ * smaller than its reverse complement, rather than always to the left of the target's forward strand (compare
+ * canonical k-mers). The choice depends only on the sequence, not on which sequence is the target or which
+ * strand the alignment is on, so alignments between any pair of sequences that share a repeat put an indel in
+ * it at the same bases, with no reference to orient them by. Returns the number of gap moves made.
+ */
+int64_t paf_canonical_align(Paf *paf, char *query_seq, char *target_seq);
+
+/*
  * Remove the prefix and suffixes with identity < identity - (score_fraction * identity) of the entire alignment.
  * Max fraction to trim is largest fraction of the alignment to trim as part of a tail.
  */

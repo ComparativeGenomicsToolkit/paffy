@@ -55,6 +55,10 @@ static void usage(void) {
     fprintf(stderr, "Move each gap as far left on the target as the sequences allow, without changing the alignment's score\n");
     fprintf(stderr, "-i --inputFile : Input paf file. If not specified reads from stdin\n");
     fprintf(stderr, "-o --outputFile : Output paf file. If not specified outputs to stdout\n");
+    fprintf(stderr, "-c --canonical : Instead of left on the target, put each gap at whichever end of its repeat makes the\n"
+                    "                 repeat read smaller than its reverse complement. This does not depend on which sequence\n"
+                    "                 is the target or on strand, so needs no reference to make alignments between many\n"
+                    "                 pairs of sequences agree\n");
     fprintf(stderr, "-l --logLevel : Set the log level\n");
     fprintf(stderr, "-h --help : Print this help message\n");
 }
@@ -68,6 +72,7 @@ int paffy_left_align_main(int argc, char *argv[]) {
     char *logLevelString = NULL;
     char *inputFile = NULL;
     char *outputFile = NULL;
+    bool canonical = 0;
 
     ///////////////////////////////////////////////////////////////////////////
     // Parse the inputs
@@ -77,11 +82,12 @@ int paffy_left_align_main(int argc, char *argv[]) {
         static struct option long_options[] = { { "logLevel", required_argument, 0, 'l' },
                                                 { "inputFile", required_argument, 0, 'i' },
                                                 { "outputFile", required_argument, 0, 'o' },
+                                                { "canonical", no_argument, 0, 'c' },
                                                 { "help", no_argument, 0, 'h' },
                                                 { 0, 0, 0, 0 } };
 
         int option_index = 0;
-        int64_t key = getopt_long(argc, argv, "l:i:o:h", long_options, &option_index);
+        int64_t key = getopt_long(argc, argv, "l:i:o:ch", long_options, &option_index);
         if (key == -1) {
             break;
         }
@@ -95,6 +101,9 @@ int paffy_left_align_main(int argc, char *argv[]) {
                 break;
             case 'o':
                 outputFile = optarg;
+                break;
+            case 'c':
+                canonical = 1;
                 break;
             case 'h':
                 usage();
@@ -165,7 +174,8 @@ int paffy_left_align_main(int argc, char *argv[]) {
                 fprintf(stderr, "No target sequence named: %s found\n", paf->target_name);
                 exit(1);
             }
-            gaps_moved += paf_left_align(paf, query_seq, target_seq);
+            gaps_moved += canonical ? paf_canonical_align(paf, query_seq, target_seq)
+                                    : paf_left_align(paf, query_seq, target_seq);
             paf_check(paf);
             write_with_cigar(output, line, paf->cigar);
         } else {

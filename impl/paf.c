@@ -848,9 +848,12 @@ static inline char paf_aligned_query_base(Paf *paf, char *query_seq, int64_t i) 
                                     : stString_reverseComplementChar(query_seq[paf->query_end - 1 - i]));
 }
 
-int64_t paf_left_align(Paf *paf, char *query_seq, char *target_seq) {
+/*
+ * paf_left_align, except that it leaves every diagonal as M, and sets encoded if the input had =/X for the
+ * caller to put back
+ */
+static int64_t paf_left_align2(Paf *paf, char *query_seq, char *target_seq, bool *encoded_out) {
     Cigar *cigar = paf->cigar;
-    if(cigar == NULL) return 0;
 
     // The output is built as a stack, so a gap can slide back into the runs already written. Each input op pushes
     // at most two records: itself, and the run a gap leaves behind it when it moves.
@@ -931,6 +934,134 @@ int64_t paf_left_align(Paf *paf, char *query_seq, char *target_seq) {
     cigar->start = 0;
     cigar->capacity = capacity;
 
+    *encoded_out = encoded;
+    return gaps_moved;
+}
+
+int64_t paf_left_align(Paf *paf, char *query_seq, char *target_seq) {
+    if(paf->cigar == NULL) return 0;
+    bool encoded;
+    int64_t gaps_moved = paf_left_align2(paf, query_seq, target_seq, &encoded);
+    if(encoded) {
+        paf_encode_mismatches(paf, query_seq, target_seq);
+    }
+    return gaps_moved;
+}
+
+/*
+ * Base i of the sequence a gap of kind op is made of: the target for a delete, the query as aligned for an insert
+ */
+static inline char paf_gap_base(Paf *paf, char *query_seq, char *target_seq, CigarOp op, int64_t i) {
+    return op == query_delete ? toupper(target_seq[paf->target_start + i]) : paf_aligned_query_base(paf, query_seq, i);
+}
+
+/*
+ * Whether [a, b) of the sequence a gap of kind op is made of, the stretch the gap can sit anywhere along, is
+ * bigger than its reverse complement, which puts the gap at the stretch's right end. Read from the other strand
+ * the stretch is that reverse complement and the answer flips, so both strands pick the same bases. Where the
+ * two are equal (a reverse complement palindrome) the comparison is widened a base each side at a time, up to
+ * 32 or the ends of the alignment, and if that does not settle it the gap stays left.
+ */
+static bool paf_gap_goes_right(Paf *paf, char *query_seq, char *target_seq, CigarOp op, int64_t a, int64_t b,
+                               int64_t span) {
+    for(int64_t k = 0; k <= 32 && a - k >= 0 && b + k <= span; k++) {
+        int64_t lo = a - k, hi = b + k;
+        for(int64_t i = 0; i < hi - lo; i++) {
+            char x = paf_gap_base(paf, query_seq, target_seq, op, lo + i);
+            char y = stString_reverseComplementChar(paf_gap_base(paf, query_seq, target_seq, op, hi - 1 - i));
+            if(x != y) {
+                return x > y;
+            }
+        }
+    }
+    return false;
+}
+
+/*
+ * The second half of paf_canonical_align: given a left-aligned cigar of M and gaps, move each gap whose stretch
+ * says so (paf_gap_goes_right) as far right as it goes, short of the next gap or the end of the alignment.
+ * Returns how many gaps moved.
+ */
+static int64_t paf_canonical_shift_right(Paf *paf, char *query_seq, char *target_seq) {
+    Cigar *cigar = paf->cigar;
+    CigarRecord *in = cigar->recs + cigar->start; // consumed as we go: a gap moving right eats into the run after it
+    int64_t m = cigar->length;
+    int64_t capacity = 2 * m + 1;
+    CigarRecord *out = st_malloc(capacity * sizeof(CigarRecord));
+    int64_t n = 0;
+    int64_t q = 0, t = 0; // offsets of the next input op into the aligned query and the target
+    int64_t gaps_moved = 0;
+
+    for(int64_t idx = 0; idx < m; idx++) {
+        int64_t len = in[idx].length;
+        if(len == 0) {
+            continue;
+        }
+        if(in[idx].op == match) {
+            if(n > 0 && out[n-1].op == match) {
+                out[n-1].length += len;
+            } else {
+                out[n].op = match; out[n].length = len; n++;
+            }
+            q += len; t += len;
+            continue;
+        }
+        CigarOp op = in[idx].op;
+        assert(op == query_insert || op == query_delete);
+        int64_t gq = q, gt = t; // where the gap starts
+        int64_t pos = op == query_delete ? gt : gq;
+        int64_t span = op == query_delete ? paf->target_end - paf->target_start : paf->query_end - paf->query_start;
+
+        // the stretch the gap could sit anywhere along, going by the sequence alone
+        int64_t a = pos, b = pos + len;
+        while(a > 0 && paf_gap_base(paf, query_seq, target_seq, op, a - 1) ==
+                       paf_gap_base(paf, query_seq, target_seq, op, a - 1 + len)) {
+            a--;
+        }
+        while(b < span && paf_gap_base(paf, query_seq, target_seq, op, b) ==
+                          paf_gap_base(paf, query_seq, target_seq, op, b - len)) {
+            b++;
+        }
+
+        int64_t next = idx + 1, moved = 0;
+        if(paf_gap_goes_right(paf, query_seq, target_seq, op, a, b, span)) {
+            // the mirror image of moving left: the column after the gap goes to just before it. Unlike moving left
+            // this never empties the run, so never merges with the next gap: the direction was chosen for this gap,
+            // and a merged one could choose the other way, so running this again would move it
+            while(next < m && in[next].op == match && in[next].length > 1 &&
+                  paf_gap_base(paf, query_seq, target_seq, op, pos) ==
+                  paf_gap_base(paf, query_seq, target_seq, op, pos + len)) {
+                in[next].length--; pos++; gq++; gt++; moved++;
+            }
+        }
+        if(moved > 0) {
+            if(n > 0 && out[n-1].op == match) {
+                out[n-1].length += moved;
+            } else {
+                out[n].op = match; out[n].length = moved; n++;
+            }
+            gaps_moved++;
+        }
+        out[n].op = op; out[n].length = len; n++;
+        assert(n <= capacity);
+        idx = next - 1;
+        q = gq + (op == query_insert ? len : 0);
+        t = gt + (op == query_delete ? len : 0);
+    }
+
+    free(cigar->recs);
+    cigar->recs = out;
+    cigar->length = n;
+    cigar->start = 0;
+    cigar->capacity = capacity;
+    return gaps_moved;
+}
+
+int64_t paf_canonical_align(Paf *paf, char *query_seq, char *target_seq) {
+    if(paf->cigar == NULL) return 0;
+    bool encoded;
+    int64_t gaps_moved = paf_left_align2(paf, query_seq, target_seq, &encoded);
+    gaps_moved += paf_canonical_shift_right(paf, query_seq, target_seq);
     if(encoded) {
         paf_encode_mismatches(paf, query_seq, target_seq);
     }
