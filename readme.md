@@ -32,8 +32,9 @@ All Paffy utilities are run using `paffy <command>`, where the available command
     to_bed         Build an alignment coverage map of a chosen sequence in BED format
     shatter        Break the PAFs into gapless subalignments
     invert         Switch query and target
-    left_align     Move each gap as far left on the target as the sequences allow (score unchanged), so
-                   equivalent indels in repeats are written the same way in every alignment
+    left_align     Move each gap along its repeat (score unchanged), so equivalent indels are written the same
+                   way in every alignment: left on the target, or with --canonical at whichever end the repeat
+                   reads smaller than its reverse complement, which agrees across any pairs and strands
     tile           Give alignments levels, from lowest (best) to highest (worse) by greedily picking
                    the best alignment at each location
     dedupe         Remove duplicate alignments from a file based on exact query/target coordinates
