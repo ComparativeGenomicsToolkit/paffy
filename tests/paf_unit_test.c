@@ -730,6 +730,301 @@ static void test_paf_check_valid(CuTest *tc) {
     CuAssertTrue(tc, 1);  /* reached here without aborting */
 }
 
+/* ---- 17. Left-aligning gaps ---- */
+
+static char *cigar_to_str(Cigar *c, bool reversed) {
+    static const char ops[] = { 'M', 'I', 'D', '=', 'X' };
+    stList *parts = stList_construct3(0, free);
+    for (int64_t i = 0; i < cigar_count(c); i++) {
+        CigarRecord *r = cigar_get(c, reversed ? cigar_count(c) - 1 - i : i);
+        stList_append(parts, stString_print("%" PRIi64 "%c", (int64_t)r->length, ops[r->op]));
+    }
+    char *s = stString_join2("", parts);
+    stList_destruct(parts);
+    return s;
+}
+
+static char *reverse_str(const char *s) {
+    int64_t n = strlen(s);
+    char *r = st_malloc(n + 1);
+    for (int64_t i = 0; i < n; i++) {
+        r[i] = s[n - 1 - i];
+    }
+    r[n] = '\0';
+    return r;
+}
+
+/* The target and the query as aligned get flanks, so that the alignment does not start at zero, and the query is
+ * reverse complemented on the opposite strand */
+static Paf *make_flanked_paf(const char *target, const char *aligned_query, bool same_strand, const char *cigar,
+                             char **t, char **q) {
+    *t = stString_print("TTTT%sTTT", target);
+    char *full_q = stString_print("CCC%sGG", aligned_query);
+    *q = same_strand ? stString_copy(full_q) : stString_reverseComplementString(full_q);
+    free(full_q);
+    int64_t ql = strlen(aligned_query), tl = strlen(target), qs = same_strand ? 3 : 2;
+    return make_paf("q", ql + 5, qs, qs + ql, same_strand, "t", tl + 7, 4, 4 + tl, 0, 0, 60, cigar);
+}
+
+/* Counts of the alignment's columns of each kind (as paf_stats_calc), which are what its score is made of */
+static void alignment_stats(const char *target, const char *aligned_query, bool same_strand, const char *cigar,
+                            int64_t *stats) {
+    char *t, *q;
+    Paf *p = make_flanked_paf(target, aligned_query, same_strand, cigar, &t, &q);
+    paf_check(p);
+    paf_remove_mismatches(p);
+    paf_encode_mismatches(p, q, t);
+    paf_stats_calc(p, &stats[0], &stats[1], &stats[2], &stats[3], &stats[4], &stats[5], 1);
+    paf_destruct(p);
+    free(t); free(q);
+}
+
+/* Left-align the cigar, returning the new one, and the number of gaps moved in moved if not NULL */
+static char *gap_align_str(const char *target, const char *aligned_query, bool same_strand, const char *cigar,
+                           int64_t *moved, bool canonical) {
+    char *t, *q;
+    Paf *p = make_flanked_paf(target, aligned_query, same_strand, cigar, &t, &q);
+    int64_t m = canonical ? paf_canonical_align(p, q, t) : paf_left_align(p, q, t);
+    if (moved) *moved = m;
+    paf_check(p);
+    char *s = cigar_to_str(p->cigar, 0);
+    paf_destruct(p);
+    free(t); free(q);
+    return s;
+}
+
+static char *left_align_str(const char *target, const char *aligned_query, bool same_strand, const char *cigar,
+                            int64_t *moved) {
+    return gap_align_str(target, aligned_query, same_strand, cigar, moved, 0);
+}
+
+static char *canonical_align_str(const char *target, const char *aligned_query, bool same_strand, const char *cigar) {
+    return gap_align_str(target, aligned_query, same_strand, cigar, NULL, 1);
+}
+
+static void check_left_align(CuTest *tc, const char *target, const char *aligned_query, const char *cigar,
+                             const char *expected) {
+    for (int strand = 0; strand < 2; strand++) {
+        char *got = left_align_str(target, aligned_query, strand == 0, cigar, NULL);
+        CuAssertStrEquals(tc, expected, got);
+        free(got);
+    }
+}
+
+static void test_paf_left_align_tandem_delete(CuTest *tc) {
+    /* one CA of (CA)3 deleted, written at the right end of the repeat */
+    check_left_align(tc, "TTGCACACAGTT", "TTGCACAGTT", "7M2D3M", "3M2D7M");
+    /* already left: nothing moves */
+    check_left_align(tc, "TTGCACACAGTT", "TTGCACAGTT", "3M2D7M", "3M2D7M");
+}
+
+static void test_paf_left_align_tandem_insert(CuTest *tc) {
+    check_left_align(tc, "TTGCACAGTT", "TTGCACACAGTT", "7M2I3M", "3M2I7M");
+}
+
+static void test_paf_left_align_homopolymer_encoded(CuTest *tc) {
+    check_left_align(tc, "GCAAAATC", "GCAAATC", "5=1D2=", "2=1D5=");
+    /* a mismatch before the repeat stops nothing it shouldn't */
+    check_left_align(tc, "GCAAAATC", "GTAAATC", "1=1X3=1D2=", "1=1X1D5=");
+    /* a mismatch inside the repeat moves to the other side of the gap, keeping its pair of bases */
+    check_left_align(tc, "GAAAAC", "GATAC", "2=1X1=1D1=", "1=1D1=1X2=");
+    /* M in, M out */
+    check_left_align(tc, "GAAAAC", "GATAC", "4M1D1M", "1M1D4M");
+}
+
+static void test_paf_left_align_alignment_start(CuTest *tc) {
+    /* the gap could go to the very start, but stops one column short of it */
+    check_left_align(tc, "AAAT", "AAT", "2M1D1M", "1M1D2M");
+    check_left_align(tc, "AAT", "AAAT", "2M1I1M", "1M1I2M");
+}
+
+static void test_paf_left_align_merge(CuTest *tc) {
+    /* two single-base deletes in a run of A meet, and become one */
+    check_left_align(tc, "GAAAAT", "GAAT", "2M1D1M1D1M", "1M2D3M");
+    /* adjacent gaps of the same kind are merged even when nothing moves */
+    check_left_align(tc, "GCTA", "GA", "1M1D1D1M", "1M2D1M");
+    /* a gap does not run into one of the other kind */
+    check_left_align(tc, "GAAT", "GCAT", "1M1I1D2M", "1M1I1D2M");
+}
+
+/* a small deterministic generator, so the random tests do not depend on, or disturb, the global one */
+static uint64_t la_state = 88172645463325252ULL;
+static int64_t la_rand(int64_t n) {
+    la_state ^= la_state << 13; la_state ^= la_state >> 7; la_state ^= la_state << 17;
+    return (int64_t)(la_state % (uint64_t)n);
+}
+
+static char la_base(void) { // mostly A and C, so there are plenty of repeats for gaps to slide in
+    return la_rand(8) == 0 ? "GT"[la_rand(2)] : "AC"[la_rand(2)];
+}
+
+static void test_paf_left_align_equivalent_placements(CuTest *tc) {
+    /* Any of the places a gap can equivalently go must left-align to the same one. A right-aligned placement is
+     * made by left-aligning the reversed alignment, and must come back to the left-aligned one. */
+    for (int64_t test = 0; test < 2000; test++) {
+        int64_t n = 10 + la_rand(30), l = 1 + la_rand(4), p = 1 + la_rand(n - 1 - l);
+        bool del = la_rand(2);
+        char *t = st_malloc(n + 1);
+        for (int64_t i = 0; i < n; i++) t[i] = la_base();
+        t[n] = '\0';
+        char *q = st_malloc(n + l + 1);
+        int64_t ql = 0;
+        for (int64_t i = 0; i < n; i++) {
+            if (!del && i == p) for (int64_t j = 0; j < l; j++) q[ql++] = la_base();
+            if (!del || i < p || i >= p + l) q[ql++] = t[i];
+        }
+        q[ql] = '\0';
+        for (int64_t k = la_rand(3); k > 0; k--) { // a few substitutions, away from inserted bases
+            int64_t i = la_rand(ql);
+            if (del || i < p || i >= p + l) q[i] = la_base();
+        }
+        char *cigar = del ? stString_print("%" PRIi64 "M%" PRIi64 "D%" PRIi64 "M", p, l, n - p - l)
+                          : stString_print("%" PRIi64 "M%" PRIi64 "I%" PRIi64 "M", p, l, n - p);
+        bool same_strand = la_rand(2);
+
+        int64_t stats0[6], stats1[6], moved;
+        char *left = left_align_str(t, q, same_strand, cigar, NULL);
+        char *rt = reverse_str(t), *rq = reverse_str(q);
+        Cigar *rc = cigar_parse(cigar);
+        char *rcigar = cigar_to_str(rc, 1);
+        char *rleft = left_align_str(rt, rq, same_strand, rcigar, NULL);
+        Cigar *rlc = cigar_parse(rleft);
+        char *right = cigar_to_str(rlc, 1);
+        char *left2 = left_align_str(t, q, same_strand, right, NULL);
+        CuAssertStrEquals(tc, left, left2);
+        alignment_stats(t, q, same_strand, cigar, stats0);
+        alignment_stats(t, q, same_strand, right, stats1);
+        for (int i = 0; i < 6; i++) CuAssertIntEquals(tc, (int)stats0[i], (int)stats1[i]);
+        char *left3 = left_align_str(t, q, same_strand, left, &moved);
+        CuAssertStrEquals(tc, left, left3);
+        CuAssertIntEquals(tc, 0, (int)moved);
+
+        free(t); free(q); free(cigar); free(left); free(rt); free(rq); cigar_destruct(rc); free(rcigar);
+        free(rleft); cigar_destruct(rlc); free(right); free(left2); free(left3);
+    }
+}
+
+static void test_paf_left_align_preserves_columns(CuTest *tc) {
+    /* Alignments with many gaps: whatever moves, the counts of matches, mismatches and gap bases are unchanged,
+     * and a second pass moves nothing */
+    for (int64_t test = 0; test < 2000; test++) {
+        stList *ops = stList_construct3(0, free);
+        char t[512], q[512];
+        int64_t tl = 0, ql = 0;
+        int64_t m = 1 + la_rand(4);
+        for (int64_t i = 0; i < m; i++) { t[tl] = q[ql] = la_base(); tl++; ql++; }
+        stList_append(ops, stString_print("%" PRIi64 "M", m));
+        for (int64_t k = 1 + la_rand(6); k > 0; k--) {
+            int64_t l = 1 + la_rand(3);
+            if (la_rand(2)) { for (int64_t i = 0; i < l; i++) t[tl++] = la_base(); stList_append(ops, stString_print("%" PRIi64 "D", l)); }
+            else { for (int64_t i = 0; i < l; i++) q[ql++] = la_base(); stList_append(ops, stString_print("%" PRIi64 "I", l)); }
+            m = la_rand(5); // no run between gaps sometimes
+            for (int64_t i = 0; i < m; i++) { t[tl] = la_base(); q[ql] = la_rand(5) ? t[tl] : la_base(); tl++; ql++; }
+            if (m > 0) stList_append(ops, stString_print("%" PRIi64 "M", m));
+        }
+        t[tl] = q[ql] = '\0';
+        char *cigar = stString_join2("", ops);
+        bool same_strand = la_rand(2);
+
+        int64_t before[6], after[6], moved;
+        alignment_stats(t, q, same_strand, cigar, before);
+        char *left = left_align_str(t, q, same_strand, cigar, NULL);
+        alignment_stats(t, q, same_strand, left, after);
+        CuAssertIntEquals(tc, (int)before[0], (int)after[0]); // matches
+        CuAssertIntEquals(tc, (int)before[1], (int)after[1]); // mismatches
+        CuAssertIntEquals(tc, (int)before[4], (int)after[4]); // inserted bases
+        CuAssertIntEquals(tc, (int)before[5], (int)after[5]); // deleted bases
+        CuAssertTrue(tc, after[2] + after[3] <= before[2] + before[3]); // gaps only ever merge
+        char *left2 = left_align_str(t, q, same_strand, left, &moved);
+        CuAssertStrEquals(tc, left, left2);
+        CuAssertIntEquals(tc, 0, (int)moved);
+
+        // the same of canonical placement, which a second pass leaves where it is (it moves gaps left and back)
+        char *canon = canonical_align_str(t, q, same_strand, cigar);
+        alignment_stats(t, q, same_strand, canon, after);
+        CuAssertIntEquals(tc, (int)before[0], (int)after[0]);
+        CuAssertIntEquals(tc, (int)before[1], (int)after[1]);
+        CuAssertIntEquals(tc, (int)before[4], (int)after[4]);
+        CuAssertIntEquals(tc, (int)before[5], (int)after[5]);
+        char *canon2 = canonical_align_str(t, q, same_strand, canon);
+        CuAssertStrEquals(tc, canon, canon2);
+
+        free(cigar); free(left); free(left2); free(canon); free(canon2);
+        stList_destruct(ops);
+    }
+}
+
+
+static void test_paf_canonical_align_tandem(CuTest *tc) {
+    for (int strand = 0; strand < 2; strand++) {
+        char *c;
+        /* (CA)3 reads smaller than (TG)3, so a deletion in it stays at the left of CACACA ... */
+        c = canonical_align_str("TTGCACACAGTT", "TTGCACAGTT", strand, "7M2D3M");
+        CuAssertStrEquals(tc, "3M2D7M", c); free(c);
+        /* ... and seen from the other strand, as (TG)3, it goes right: the same bases either way */
+        c = canonical_align_str("AACTGTGTGCAA", "AACTGTGCAA", strand, "3M2D7M");
+        CuAssertStrEquals(tc, "7M2D3M", c); free(c);
+        /* an insert is judged on the query */
+        c = canonical_align_str("AACTGTGCAA", "AACTGTGTGCAA", strand, "3M2I7M");
+        CuAssertStrEquals(tc, "7M2I3M", c); free(c);
+        /* (AT)3 is its own reverse complement, so the flanks decide: TTG..GTT against its reverse complement
+         * AAC..CAA is bigger, and the gap goes right */
+        c = canonical_align_str("TTGATATATGTT", "TTGATATGTT", strand, "3M2D7M");
+        CuAssertStrEquals(tc, "7M2D3M", c); free(c);
+    }
+}
+
+static void test_paf_canonical_align_strand_invariant(CuTest *tc) {
+    /* An indel must land on the same bases seen from either strand: aligning the reverse complements of both
+     * sequences, with the cigar reversed, must give the reversed cigar. With left_align it would not.
+     * The one exception is a gap whose surroundings are their own reverse complement out to the ends of the
+     * alignment, which looks the same from both strands and so cannot be told apart: both stay left */
+    int64_t left_differs = 0, unsettled = 0;
+    for (int64_t test = 0; test < 2000; test++) {
+        int64_t n = 10 + la_rand(30), l = 1 + la_rand(4), p = 1 + la_rand(n - 1 - l);
+        bool del = la_rand(2);
+        char *t = st_malloc(n + 1);
+        for (int64_t i = 0; i < n; i++) t[i] = "ACGT"[la_rand(4)];
+        t[n] = '\0';
+        char *q = st_malloc(n + l + 1);
+        int64_t ql = 0;
+        for (int64_t i = 0; i < n; i++) {
+            if (!del && i == p) for (int64_t j = 0; j < l; j++) q[ql++] = t[p - l + j >= 0 ? p - l + j : 0]; // a duplication
+            if (!del || i < p || i >= p + l) q[ql++] = t[i];
+        }
+        q[ql] = '\0';
+        char *cigar = del ? stString_print("%" PRIi64 "M%" PRIi64 "D%" PRIi64 "M", p, l, n - p - l)
+                          : stString_print("%" PRIi64 "M%" PRIi64 "I%" PRIi64 "M", p, l, n - p);
+        bool same_strand = la_rand(2);
+        char *rt = stString_reverseComplementString(t), *rq = stString_reverseComplementString(q);
+        Cigar *c = cigar_parse(cigar);
+        char *rcigar = cigar_to_str(c, 1);
+
+        char *canon = canonical_align_str(t, q, same_strand, cigar);
+        char *rcanon = canonical_align_str(rt, rq, same_strand, rcigar);
+        Cigar *rc = cigar_parse(rcanon);
+        char *rcanon_back = cigar_to_str(rc, 1);
+
+        char *left = left_align_str(t, q, same_strand, cigar, NULL);
+        char *rleft = left_align_str(rt, rq, same_strand, rcigar, NULL);
+        Cigar *rl = cigar_parse(rleft);
+        char *rleft_back = cigar_to_str(rl, 1);
+        left_differs += strcmp(left, rleft_back) != 0;
+
+        if (strcmp(canon, left) == 0 && strcmp(rcanon, rleft) == 0 && strcmp(left, rleft_back) != 0) {
+            unsettled++; // left from both strands, which is only right when the strands cannot be told apart
+        } else {
+            CuAssertStrEquals(tc, canon, rcanon_back);
+        }
+
+        free(t); free(q); free(cigar); free(rt); free(rq); cigar_destruct(c); free(rcigar); free(canon);
+        free(rcanon); cigar_destruct(rc); free(rcanon_back); free(left); free(rleft); cigar_destruct(rl);
+        free(rleft_back);
+    }
+    CuAssertTrue(tc, left_differs > 100); // the test has teeth: plain left-aligning is not strand invariant
+    CuAssertTrue(tc, unsettled < left_differs / 20);
+}
+
 /* ---- Registration ---- */
 
 CuSuite *addPafUnitTestSuite(void) {
@@ -774,5 +1069,14 @@ CuSuite *addPafUnitTestSuite(void) {
     SUITE_ADD_TEST(suite, test_paf_trim_unreliable_tails_opposite_strand);
     SUITE_ADD_TEST(suite, test_paf_pretty_print_basic);
     SUITE_ADD_TEST(suite, test_paf_check_valid);
+    SUITE_ADD_TEST(suite, test_paf_left_align_tandem_delete);
+    SUITE_ADD_TEST(suite, test_paf_left_align_tandem_insert);
+    SUITE_ADD_TEST(suite, test_paf_left_align_homopolymer_encoded);
+    SUITE_ADD_TEST(suite, test_paf_left_align_alignment_start);
+    SUITE_ADD_TEST(suite, test_paf_left_align_merge);
+    SUITE_ADD_TEST(suite, test_paf_left_align_equivalent_placements);
+    SUITE_ADD_TEST(suite, test_paf_left_align_preserves_columns);
+    SUITE_ADD_TEST(suite, test_paf_canonical_align_tandem);
+    SUITE_ADD_TEST(suite, test_paf_canonical_align_strand_invariant);
     return suite;
 }
