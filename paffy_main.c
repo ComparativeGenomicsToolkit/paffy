@@ -18,6 +18,7 @@ extern int paffy_shatter_main(int argc, char *argv[]);
 extern int paffy_tile_main(int argc, char *argv[]);
 extern int paffy_to_bed_main(int argc, char *argv[]);
 extern int paffy_trim_main(int argc, char *argv[]);
+extern int paffy_unanchor_main(int argc, char *argv[]);
 extern int paffy_upconvert_main(int argc, char *argv[]);
 extern int paffy_view_main(int argc, char *argv[]);
 extern int paffy_filter_main(int argc, char *argv[]);
@@ -39,6 +40,8 @@ void usage(void) {
                     "                             the best alignment at each location\n");
     fprintf(stderr, "    to_bed                   Build an alignment coverage map of a chosen sequence in BED format\n");
     fprintf(stderr, "    trim                     Slice of lower identity tail alignments\n");
+    fprintf(stderr, "    unanchor                 Remove the hub (minigraph) anchors of every genome at tandem-repeat loci where\n"
+                    "                             they disagree, so that cactus realigns those loci\n");
     fprintf(stderr, "    upconvert                Converts the coordinates of paf alignments to refer to extracted subsequences\n");
     fprintf(stderr, "    split_file               Split PAF file into per-target-contig output files\n");
     fprintf(stderr, "    view                     Pretty print and extract stats about PAF alignments\n");
@@ -77,6 +80,8 @@ int main(int argc, char *argv[]) {
         return paffy_to_bed_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "trim") == 0) {
         return paffy_trim_main(argc - 1, argv + 1);
+    } else if (strcmp(argv[1], "unanchor") == 0) {
+        return paffy_unanchor_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "upconvert") == 0) {
         return paffy_upconvert_main(argc - 1, argv + 1);
     } else if (strcmp(argv[1], "split_file") == 0) {

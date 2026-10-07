@@ -302,5 +302,17 @@ int64_t paf_canonical_align(Paf *paf, char *query_seq, char *target_seq);
  */
 void paf_trim_unreliable_tails(Paf *paf, float score_fraction, float max_fraction_to_trim);
 
+/*
+ * Hamming tandem-repeat scan of seq[0..n) (paffy unanchor). For each period p in [min_period, max_period]
+ * (max_period <= 100), a window of w = max(p, window) comparisons s[j] == s[j + p] (N never matches) with at least
+ * ceil(min_identity * w) matches marks s[i, i + w + p); marks of one period are merged when they overlap or touch.
+ * The union of every period's marks (touching runs merged) is returned as (start, end, period) triples, sorted,
+ * each labelled with the smallest period whose marked bp in it is within 10% of the best period's. Periods run on
+ * up to threads threads; the result does not depend on that number. Returns a malloc'd array of 3 * call_number
+ * int64s (NULL if there are no calls).
+ */
+int64_t *tandem_scan(const char *seq, int64_t n, int64_t min_period, int64_t max_period, int64_t window,
+                     double min_identity, int64_t threads, int64_t *call_number);
+
 #endif /* ST_PAF_H_ */
 
