@@ -1025,6 +1025,62 @@ static void test_paf_canonical_align_strand_invariant(CuTest *tc) {
     CuAssertTrue(tc, unsettled < left_differs / 20);
 }
 
+/* ---- paffy unanchor: tandem_scan (expected calls are the anchor-trim Python reference's) ---- */
+
+static char *tandem_test_seq(void) {
+    const char *a = "TTTCCTCATGCAATTCAAAACCATGTCCGTAATGTAGGCGAAATAGTAAACCATTTTACG";
+    const char *b = "GAGGATACCAAATTCCTCCTTATTCAGGACCTAACCTGAGGTAAACCAGGTCTCTCCGCC";
+    const char *c = "CCCTTATAAAAGCTGTTGCACCTAGCCAAGTTCAACGGCAGCTGCAATGGAAATAGGCAA";
+    const char *d = "TGACGGATATATATTAAAAAGTGTTTTAAGATACATTGAGGCCCGTTCGTGCTCCTCGCC";
+    char *ca200 = st_calloc(401, 1), *ca100 = st_calloc(201, 1), *p6 = st_calloc(361, 1), *n30 = st_calloc(31, 1);
+    for (int i = 0; i < 200; i++) memcpy(ca200 + 2 * i, "CA", 2);
+    for (int i = 0; i < 100; i++) memcpy(ca100 + 2 * i, "CA", 2);
+    for (int i = 0; i < 60; i++) memcpy(p6 + 6 * i, "ACGTTG", 6);
+    memset(n30, 'N', 30);
+    char *s = stString_print("%s%s%s%s%s%s%s%s%s", a, ca200, b, p6, c, ca100, n30, ca100, d);
+    free(ca200); free(ca100); free(p6); free(n30);
+    return s;
+}
+
+static void test_tandem_scan_periods(CuTest *tc) {
+    // (CA)200 is labelled 2 and (ACGTTG)60 is labelled 6, not 12 or 18: the smallest period within 10% of the
+    // best coverage. Two (CA)100 runs around 30 Ns are one call at periods up to 100 (period 40 bridges the Ns)
+    char *s = tandem_test_seq();
+    int64_t n = strlen(s), expect[] = { 31, 489, 2, 498, 910, 6, 912, 1393, 40 };
+    CuAssertIntEquals(tc, 1430, n);
+    for (int64_t threads = 1; threads <= 3; threads += 2) { // the result does not depend on the thread count
+        int64_t nc;
+        int64_t *calls = tandem_scan(s, n, 2, 100, 20, 0.8, threads, &nc);
+        CuAssertIntEquals(tc, 3, nc);
+        for (int64_t i = 0; i < 9; i++) CuAssertIntEquals(tc, expect[i], calls[i]);
+        free(calls);
+    }
+    free(s);
+}
+
+static void test_tandem_scan_n_breaks_run(CuTest *tc) {
+    // with periods up to 20 no window reaches across 30 Ns (N never matches): two calls
+    const char *c = "CCCTTATAAAAGCTGTTGCACCTAGCCAAGTTCAACGGCAGCTGCAATGGAAATAGGCAA";
+    const char *d = "TGACGGATATATATTAAAAAGTGTTTTAAGATACATTGAGGCCCGTTCGTGCTCCTCGCC";
+    char *ca = st_calloc(201, 1), *n30 = st_calloc(31, 1);
+    for (int i = 0; i < 100; i++) memcpy(ca + 2 * i, "CA", 2);
+    memset(n30, 'N', 30);
+    char *s = stString_print("%s%s%s%s%s", c, ca, n30, ca, d);
+    int64_t nc, expect[] = { 54, 264, 2, 286, 494, 2 };
+    int64_t *calls = tandem_scan(s, strlen(s), 2, 20, 20, 0.8, 1, &nc);
+    CuAssertIntEquals(tc, 2, nc);
+    for (int64_t i = 0; i < 6; i++) CuAssertIntEquals(tc, expect[i], calls[i]);
+    free(calls);
+    // no repeat, no call; a sequence shorter than any window, no call
+    calls = tandem_scan(c, strlen(c), 2, 100, 20, 0.8, 1, &nc);
+    CuAssertIntEquals(tc, 0, nc);
+    free(calls);
+    calls = tandem_scan("CACACA", 6, 2, 100, 20, 0.8, 1, &nc);
+    CuAssertIntEquals(tc, 0, nc);
+    free(calls);
+    free(s); free(ca); free(n30);
+}
+
 /* ---- Registration ---- */
 
 CuSuite *addPafUnitTestSuite(void) {
@@ -1078,5 +1134,7 @@ CuSuite *addPafUnitTestSuite(void) {
     SUITE_ADD_TEST(suite, test_paf_left_align_preserves_columns);
     SUITE_ADD_TEST(suite, test_paf_canonical_align_tandem);
     SUITE_ADD_TEST(suite, test_paf_canonical_align_strand_invariant);
+    SUITE_ADD_TEST(suite, test_tandem_scan_periods);
+    SUITE_ADD_TEST(suite, test_tandem_scan_n_breaks_run);
     return suite;
 }

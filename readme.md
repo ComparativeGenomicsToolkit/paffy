@@ -42,7 +42,26 @@ All Paffy utilities are run using `paffy <command>`, where the available command
     upconvert      Converts the coordinates of paf alignments to refer to extracted subsequences
     split_file     Split a PAF file into separate output files by target contig name. Optionally
                    group small contigs (below a given target length threshold) into size-bounded files
+    unanchor       Remove the minigraph (hub) anchors of every genome at tandem-repeat loci where the genomes'
+                   anchors disagree, so that cactus realigns those loci itself (see below)
 ```
+
+`paffy unanchor` takes one chromosome's PAF of genomes against minigraph nodes (cactus-align's, after
+filter_paf), the node FASTA and the minigraph rGFA:
+
+    paffy unanchor -i chr.paf -n chr.gfa.fa.gz -g chr.gfa.gz -r CHM13 -o chr.cut.paf -L loci.bed -b hub.bed -v veto.bed -q query.bed
+
+It tandem-scans the reference genome's path through the graph (periods 2-100, satellite arrays excluded), walks
+each other contig's anchors along that path, and picks the repeat loci where at least `--minHaps` contigs both
+insert and delete bases between the anchors on either side (they disagree on the repeat's copy number or
+structure). A locus is not picked when something would make clearing it unsafe: it spans more than half of
+cactus's banding limit, the reference does not anchor itself there, a contig's anchors cross its edge, flip
+strand or step back inside it, an alt node through it is used elsewhere, some genome's sequence between the
+flanking anchors is too long, an alt allele through it holds non-repeat sequence that is not from the locus (an
+SV), or it has neither an alt node nor a node boundary. Every matched column on the picked loci's nodes is
+removed from every record, the reference's included, and the query bases that lost all their anchors are written
+to `--queryBed`. The `--logFile` summarises every step; the other BEDs list the cleared loci, the cleared node
+intervals and the loci not cleared with their reasons. The output does not depend on `--threads`.
 
 In addition the FASTA utilities are run using the `faffy <command>`, where the available commands are:
 ```
