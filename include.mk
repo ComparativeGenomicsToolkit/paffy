@@ -31,6 +31,11 @@ include ${sonLibRootDir}/include.mk
 #https://github.com/ComparativeGenomicsToolkit/cactus/issues/235
 CFLAGS += -UNDEBUG
 
+# Calling a function with no prototype in scope is an error rather than a warning. Under -std=c99 an
+# undeclared POSIX function is taken to return int, so a returned pointer is silently truncated: strtok_r
+# did that in paf_parse, and it only crashed where the heap sat above 4GB (#24)
+CFLAGS += -Werror=implicit-function-declaration
+
 ifndef TARGETOS
   TARGETOS := $(shell uname -s)
 endif
