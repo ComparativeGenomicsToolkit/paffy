@@ -105,6 +105,14 @@ lines_non_inv=$(paffy to_bed -i ${working_dir}/output.paf -e | wc -l)
 lines_inv=$(paffy to_bed -i ${working_dir}/output.paf -e -n | wc -l)
 [ "${lines_inv}" -ge "${lines_non_inv}" ]
 
+# Run paffy tile on an opposite strand alignment with an insertion (to tB), whose cigar reads the query from its end:
+# its 2M covers q8-9 and its 4M q0-3, which the better alignment to tA already covers, so it is tiled above that one,
+# and the alignment to tC, of q5-7 in its insertion, is not
+echo "paffy tile opposite strand"
+printf 'q\t10\t0\t4\t+\ttA\t4\t0\t4\t4\t4\t60\tAS:i:100\tcg:Z:4M\nq\t10\t0\t10\t-\ttB\t6\t0\t6\t6\t10\t60\tAS:i:50\tcg:Z:2M4I4M\nq\t10\t5\t8\t+\ttC\t3\t0\t3\t3\t3\t60\tAS:i:10\tcg:Z:3M\n' \
+  | paffy tile | awk '{for (i = 13; i <= NF; i++) if ($i ~ /^tl:i:/) print $6, substr($i, 6)}' | sort | tr '\n' ' ' \
+  | grep -qx 'tA 1 tB 2 tC 1 '
+
 # Run paffy filter -u (min identity after encoding mismatches)
 echo "paffy filter by min identity"
 paffy add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa \
