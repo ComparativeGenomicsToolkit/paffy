@@ -663,8 +663,7 @@ static void test_cmp_intervals(CuTest *tc) {
 static void test_paf_trim_unreliable_tails_trims_tails(CuTest *tc) {
     /* "2X5=2X": query span=9, target span=9, same_strand=false.
      * matches=5, mismatches=4, identity=5/9; score_fraction=0 so threshold=identity.
-     * For same_strand=false the suffix is trimmed via invert+trim+invert:
-     * both 2X tails are removed, leaving "5=", query=(2,7), target=(2,7). */
+     * Both 2X tails are removed, leaving "5=", query=(2,7), target=(2,7). */
     Paf *paf = make_paf("q", 9, 0, 9, false, "t", 9, 0, 9, 5, 9, 60, "2X5=2X");
     paf_trim_unreliable_tails(paf, 0.0f, 1.0f);
     CuAssertTrue(tc, paf->query_start  == 2);
@@ -713,6 +712,31 @@ static void test_paf_trim_unreliable_tails_opposite_strand(CuTest *tc) {
     CuAssertIntEquals(tc, sequence_match, cigar_get(paf->cigar, 0)->op);
     CuAssertTrue(tc, cigar_get(paf->cigar, 0)->length == 5);
     paf_destruct(paf);
+}
+
+static void test_paf_trim_unreliable_tails_suffix(CuTest *tc) {
+    /* "2X3=1I6=2D1X": query span=13, target span=14. matches=9, mismatches=6 (indels count), identity=0.6, and
+     * score_fraction=0 so threshold=identity. The prefix below the threshold runs to the 1I, but its 3=1I end is
+     * at the identity so only the 2X is trimmed. The 2D1X suffix is trimmed: the 1X takes a base off the query
+     * and the target, the 2D two bases off the target only. The suffix is the end of the query on the same
+     * strand and the start of it on the opposite strand. "3=1I6=" is left, in its order. */
+    for (int64_t strand = 0; strand < 2; strand++) {
+        bool same_strand = strand == 0;
+        Paf *paf = make_paf("q", 30, 10, 23, same_strand, "t", 200, 100, 114, 9, 15, 60, "2X3=1I6=2D1X");
+        paf_trim_unreliable_tails(paf, 0.0f, 1.0f);
+        CuAssertTrue(tc, paf->query_start  == (same_strand ? 12 : 11));
+        CuAssertTrue(tc, paf->query_end    == (same_strand ? 22 : 21));
+        CuAssertTrue(tc, paf->target_start == 102);
+        CuAssertTrue(tc, paf->target_end   == 111);
+        CuAssertIntEquals(tc, 3, cigar_count(paf->cigar));
+        CuAssertIntEquals(tc, sequence_match, cigar_get(paf->cigar, 0)->op);
+        CuAssertTrue(tc, cigar_get(paf->cigar, 0)->length == 3);
+        CuAssertIntEquals(tc, query_insert, cigar_get(paf->cigar, 1)->op);
+        CuAssertTrue(tc, cigar_get(paf->cigar, 1)->length == 1);
+        CuAssertIntEquals(tc, sequence_match, cigar_get(paf->cigar, 2)->op);
+        CuAssertTrue(tc, cigar_get(paf->cigar, 2)->length == 6);
+        paf_destruct(paf);
+    }
 }
 
 /* ---- 15. paf_pretty_print ---- */
@@ -1097,6 +1121,7 @@ CuSuite *addPafUnitTestSuite(void) {
     SUITE_ADD_TEST(suite, test_paf_trim_unreliable_tails_trims_tails);
     SUITE_ADD_TEST(suite, test_paf_trim_unreliable_tails_no_trim);
     SUITE_ADD_TEST(suite, test_paf_trim_unreliable_tails_opposite_strand);
+    SUITE_ADD_TEST(suite, test_paf_trim_unreliable_tails_suffix);
     SUITE_ADD_TEST(suite, test_paf_pretty_print_basic);
     SUITE_ADD_TEST(suite, test_paf_check_valid);
     SUITE_ADD_TEST(suite, test_paf_left_align_tandem_delete);

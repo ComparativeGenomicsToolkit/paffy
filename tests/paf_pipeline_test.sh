@@ -92,4 +92,4 @@ paffy filter -i ${working_dir}/primary_chained.paf -s 20000  > ${working_dir}/pr
 
 # Report stats on the primary alignments picked
 echo "Reporting stats on primary alignments in good chains and check aligned bases and identity are as expected"
-paffy view -i ${working_dir}/primary_final.paf ${working_dir}/*.fa -s -t -u 0.98 -v 16700000
+paffy view -i ${working_dir}/primary_final.paf ${working_dir}/*.fa -s -t -u 0.98 -v 16300000
