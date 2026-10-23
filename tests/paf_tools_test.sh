@@ -63,7 +63,7 @@ diff <(sed 's/\tcg:Z:[^\t]*//' ${working_dir}/tagged.paf) <(sed 's/\tcg:Z:[^\t]*
 
 # Run paffy view with trim (identity may be higher as we trim the tails)
 echo "paffy trim minimum local alignment identity"
-paffy add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paffy trim -r 0.05 | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 446000
+paffy add_mismatches -i ${working_dir}/output.paf ${working_dir}/*.fa | paffy trim -r 0.05 | paffy view ${working_dir}/*.fa -s -t -u 0.74 -v 403000
 
 # Run paffy view with trim (identity may be higher as we trim the tails)
 echo "paffy trim minimum local alignment identity, ignoring mismatches"
