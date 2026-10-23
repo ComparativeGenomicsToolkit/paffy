@@ -723,24 +723,27 @@ SequenceCountArray *get_alignment_count_array(stHash *seq_names_to_alignment_cou
 }
 
 void increase_alignment_level_counts(SequenceCountArray *seq_count_array, Paf *paf) {
-    int64_t i = paf->query_start;
+    // i is the offset into the query as aligned: on the opposite strand the cigar reads the query from
+    // query_end - 1 downwards (as in paf_shatter and paf_encode_mismatches)
+    int64_t i = 0;
     for (int64_t ci = 0; ci < cigar_count(paf->cigar); ci++) {
         CigarRecord *c = cigar_get(paf->cigar, ci);
         if(c->op != query_delete) {
             if(c->op != query_insert) { // Is some kind of match
                 assert(c->op == match || c->op == sequence_match || c->op == sequence_mismatch);
                 for(int64_t j=0; j<c->length; j++) {
-                    assert(i + j < paf->query_end && i + j >= 0 && i + j < paf->query_length);
-                    assert(i + j < seq_count_array->length);
-                    if(seq_count_array->counts[i + j] < INT16_MAX - 1) { // prevent overflow
-                        seq_count_array->counts[i + j]++;
+                    int64_t k = paf->same_strand ? paf->query_start + i + j : paf->query_end - 1 - (i + j);
+                    assert(k >= paf->query_start && k < paf->query_end && k < paf->query_length);
+                    assert(k < seq_count_array->length);
+                    if(seq_count_array->counts[k] < INT16_MAX - 1) { // prevent overflow
+                        seq_count_array->counts[k]++;
                     }
                 }
             }
             i += c->length;
         }
     }
-    assert(i == paf->query_end);
+    assert(i == paf->query_end - paf->query_start);
 }
 
 void interval_destruct(Interval *interval) {

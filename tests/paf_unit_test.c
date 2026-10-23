@@ -602,6 +602,35 @@ static void test_coverage_tracking(CuTest *tc) {
     stHash_destruct(h);
 }
 
+static void test_coverage_tracking_opposite_strand(CuTest *tc) {
+    stHash *h = stHash_construct3(stHash_stringKey, stHash_stringEqualKey,
+                                  NULL, (void(*)(void*))sequenceCountArray_destruct);
+
+    /* On the opposite strand the cigar reads the query from query_end - 1 down: 3M covers query positions 10,9,8,
+     * 2I covers 7,6 and 5M covers 5..1 */
+    Paf *paf = make_paf("seq1", 12, 1, 11, false, "t", 100, 0, 8, 8, 10, 60, "3M2I5M");
+    SequenceCountArray *arr = get_alignment_count_array(h, paf);
+    increase_alignment_level_counts(arr, paf);
+    int64_t expected[] = { 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0 };
+    for (int64_t i = 0; i < 12; i++) {
+        CuAssertIntEquals(tc, expected[i], arr->counts[i]);
+    }
+    paf_destruct(paf);
+
+    /* The target side, as paffy to_bed -n counts it from the inverted alignment: 2M3D5M aligns target positions
+     * 0,1 and 5..9, around the deletion of 2..4 */
+    paf = make_paf("q", 7, 0, 7, false, "seq2", 10, 0, 10, 7, 10, 60, "2M3D5M");
+    paf_invert(paf);
+    arr = get_alignment_count_array(h, paf);
+    increase_alignment_level_counts(arr, paf);
+    int64_t expected_target[] = { 1, 1, 0, 0, 0, 1, 1, 1, 1, 1 };
+    for (int64_t i = 0; i < 10; i++) {
+        CuAssertIntEquals(tc, expected_target[i], arr->counts[i]);
+    }
+    paf_destruct(paf);
+    stHash_destruct(h);
+}
+
 /* ---- 13. Interval functions ---- */
 
 static void test_decode_fasta_header(CuTest *tc) {
@@ -1062,6 +1091,7 @@ CuSuite *addPafUnitTestSuite(void) {
     SUITE_ADD_TEST(suite, test_paf_encode_mismatches_mixed);
     SUITE_ADD_TEST(suite, test_paf_remove_mismatches);
     SUITE_ADD_TEST(suite, test_coverage_tracking);
+    SUITE_ADD_TEST(suite, test_coverage_tracking_opposite_strand);
     SUITE_ADD_TEST(suite, test_decode_fasta_header);
     SUITE_ADD_TEST(suite, test_cmp_intervals);
     SUITE_ADD_TEST(suite, test_paf_trim_unreliable_tails_trims_tails);
